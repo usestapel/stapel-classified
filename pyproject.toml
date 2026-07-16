@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stapel-classified"
+version = "0.1.0"
+description = "Composite: classified ads — the shop composite + geo (location-bound listings)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["django", "stapel", "classified", "composite", "geo"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+# A composite introduces NO versions of its own — it pins the same ranges the
+# STAPEL_LIBS registry / each member lib already uses, fixing the combination.
+dependencies = [
+    "stapel-core>=0.10,<0.11",
+    "stapel-shop>=0.1,<0.2",
+    "stapel-geo>=0.2,<0.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/usestapel/stapel-classified"
+Repository = "https://github.com/usestapel/stapel-classified"
+Documentation = "https://github.com/usestapel/stapel-classified#readme"
+Changelog = "https://github.com/usestapel/stapel-classified/blob/main/CHANGELOG.md"
+Issues = "https://github.com/usestapel/stapel-classified/issues"
+
+[project.optional-dependencies]
+all = []
+
+[tool.setuptools]
+package-dir = {"stapel_classified" = "."}
+packages = ["stapel_classified", "stapel_classified.tests"]
+
+[tool.setuptools.package-data]
+stapel_classified = ["py.typed"]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+django_find_project = false
+addopts = "--tb=short -q --import-mode=importlib"
+
+[tool.coverage.run]
+omit = [
+    "*/tests/*",
+    "*/conftest.py",
+    "*/migrations/*",
+]
