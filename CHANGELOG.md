@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.2] - 2026-07-17
+
+Fleet follow-up to stapel-core 0.12.0 (legacy shim sweep). Member pins
+(`stapel-shop` 0.1.2, `stapel-geo` 0.3.2) already fit this composite's
+existing ceilings. Suite green.
+
+### Changed
+- `stapel-core` ceiling `<0.12` → `<0.13`.
+
 ## [0.1.1] - 2026-07-17
 
 ### Fixed
