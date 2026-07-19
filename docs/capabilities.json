@@ -1,0 +1,35 @@
+{
+  "module": "stapel-classified",
+  "version": "0.1.2",
+  "provides": "Composite preset for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, with listing coordinates carried as the listing's own fields rather than a projection. Mounts no urls and writes no business logic beyond the shop composite's ListingReviewSummaryProjection (preset.py).",
+  "axes": [],
+  "extension_points": [],
+  "operations_total": 0,
+  "requires": [
+    {
+      "module": "stapel-categories",
+      "optional": false,
+      "reason": "composite member, inherited from the shop scenario (preset.py INSTALLED_APPS/URL_INCLUDES)"
+    },
+    {
+      "module": "stapel-listings",
+      "optional": false,
+      "reason": "composite member — the classified ad itself (preset.py INSTALLED_APPS/URL_INCLUDES)"
+    },
+    {
+      "module": "stapel-reviews",
+      "optional": false,
+      "reason": "composite member, inherited from the shop scenario (preset.py INSTALLED_APPS/URL_INCLUDES)"
+    },
+    {
+      "module": "stapel-geo",
+      "optional": false,
+      "reason": "composite member — location binding for classified ads (preset.py INSTALLED_APPS/URL_INCLUDES)"
+    },
+    {
+      "module": "stapel-attributes",
+      "optional": false,
+      "reason": "L1 library dependency of stapel-categories/stapel-listings; pip dependency, not a Django app (preset.py comment)"
+    }
+  ]
+}
