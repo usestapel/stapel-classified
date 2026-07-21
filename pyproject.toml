@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.1.2"
+version = "0.1.3"
 description = "Composite: classified ads — the shop composite + geo (location-bound listings)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -24,7 +24,7 @@ classifiers = [
 # A composite introduces NO versions of its own — it pins the same ranges the
 # STAPEL_LIBS registry / each member lib already uses, fixing the combination.
 dependencies = [
-    "stapel-core>=0.10,<0.13",
+    "stapel-core>=0.10,<1.0",
     "stapel-shop>=0.1,<0.2",
     "stapel-geo>=0.2,<0.4",
 ]
