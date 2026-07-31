@@ -44,7 +44,7 @@ package-dir = {"stapel_classified" = "."}
 packages = ["stapel_classified", "stapel_classified.tests"]
 
 [tool.setuptools.package-data]
-stapel_classified = ["py.typed"]
+stapel_classified = ["py.typed", "docs/capabilities.json", "docs/flows.json", "docs/errors.json", "CONFIG.MD"]
 
 [tool.ruff]
 target-version = "py311"
