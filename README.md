@@ -1,5 +1,9 @@
 # stapel-classified
 
+[![license](https://img.shields.io/github/license/usestapel/stapel-classified)](https://github.com/usestapel/stapel-classified/blob/main/LICENSE)
+[![status](https://img.shields.io/badge/status-unreleased-orange)](https://github.com/usestapel/stapel-classified)
+
+Не опубликовано на PyPI. Установка из исходников: `pip install git+https://github.com/usestapel/stapel-classified`
 Composite: classified ads — the shop composite + geo (location-bound listings).
 
 ## Assemble (one line)

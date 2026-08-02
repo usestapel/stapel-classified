@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 # A composite introduces NO versions of its own — it pins the same ranges the
 # STAPEL_LIBS registry / each member lib already uses, fixing the combination.
