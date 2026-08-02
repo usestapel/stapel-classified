@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.4] - 2026-08-02
+
+### Added
+- `docs/llms.txt` — the fifth contract artifact, an agent-sized slice of the
+  hand-authored `docs/capabilities.json`, wired into a new `make contract` /
+  `make contract-check` (badge-canon §3). `docs/capabilities.json`'s
+  `version` field brought back in sync with `pyproject.toml` (it had drifted
+  to 0.1.2 across the 0.1.3 release).
+- Canonical `ci.yml` with coverage, `codecov.yml`, Python 3.14 classifier,
+  badge canon in README (truncated to license + status — this module has
+  never published to PyPI).
+
 ## [0.1.2] - 2026-07-17
 
 Fleet follow-up to stapel-core 0.12.0 (legacy shim sweep). Member pins

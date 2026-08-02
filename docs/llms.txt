@@ -1,4 +1,4 @@
-# stapel-classified 0.1.2
+# stapel-classified 0.1.4
 
 Composite preset for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, with listing coordinates carried as the listing's own fields rather than a projection. Mounts no urls and writes no business logic beyond the shop composite's ListingReviewSummaryProjection (preset.py).
 
