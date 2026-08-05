@@ -1,0 +1,7 @@
+{
+  "_comment": "Curated layer for the `surface` section of docs/capabilities.json (discoverability-design.md §1.2). stapel-classified is a COMPOSITE PRESET (projections-and-composition §3): INSTALLED_APPS/urls/config wiring over the stapel-shop scenario (categories + listings + reviews) plus stapel-geo, with location kept as the listing's own fields. It has no gate registry and no docs/schema.json — provides/axes/extension_points/requires stay hand-written and are NOT drift-gated here. `surface_roots` is deliberately empty: apps.py has no permission classes, no public functions, no capability fields and no templates of its own — the composite's whole job is transparent glue, so there is nothing here a product should call INSTEAD of reaching into the member modules (stapel-categories, stapel-listings, stapel-reviews, stapel-geo) directly. `make contract` still refreshes module/version from pyproject and would fail loudly the moment this module grows a real symbol without an intent line for it.",
+
+  "surface_roots": [],
+
+  "surface": {}
+}
