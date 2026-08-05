@@ -31,5 +31,6 @@
       "optional": false,
       "reason": "L1 library dependency of stapel-categories/stapel-listings; pip dependency, not a Django app (preset.py comment)"
     }
-  ]
+  ],
+  "surface": []
 }
