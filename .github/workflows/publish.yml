@@ -37,6 +37,9 @@ jobs:
       - name: Import check
         run: python -c "import stapel_classified; print('import OK')"
 
+      - name: Install stapel-tools (несёт эмиттер, против которого меряет дрейф-гейт)
+        run: pip install stapel-tools --quiet
+
       - name: Install test dependencies
         run: pip install pytest pytest-django
 
