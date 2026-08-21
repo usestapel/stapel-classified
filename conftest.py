@@ -6,14 +6,22 @@ def pytest_configure(config):
         # the GDAL C stack (same policy as stapel-geo's own non-spatial
         # test mode). The preset still lists it; e2e coverage is the
         # assembled project, not this unit harness.
+        #
+        # stapel_search and stapel_moderation ARE installed, and the preset's
+        # own SETTINGS_DEFAULTS are the settings under test — the point of
+        # this harness is that the composite's declarations actually wire up
+        # against the real member modules, not that they parse.
+        from stapel_classified import preset
+
         settings.configure(
-            SECRET_KEY="test-secret-key-not-for-production",
+            SECRET_KEY="test-secret-key-not-for-production-and-long-enough-for-prodguard",
             INSTALLED_APPS=[
                 "django.contrib.contenttypes",
                 "django.contrib.auth",
                 "django.contrib.sessions",
                 "django.contrib.admin",
                 "django.contrib.messages",
+                "rest_framework",
                 "stapel_core.django.apps.CommonDjangoConfig",
                 "stapel_core.django.users",
                 "stapel_core.django.projections",
@@ -21,6 +29,8 @@ def pytest_configure(config):
                 "stapel_listings",
                 "stapel_reviews",
                 "stapel_shop",
+                "stapel_search",
+                "stapel_moderation",
                 "stapel_classified",
             ],
             AUTH_USER_MODEL="users.User",
@@ -32,6 +42,49 @@ def pytest_configure(config):
             },
             DEFAULT_AUTO_FIELD="django.db.models.BigAutoField",
             USE_TZ=True,
+            ROOT_URLCONF="stapel_classified.tests.urls",
+            # A *realistic* host, not the smallest one that imports: this is
+            # what `manage.py check` is run against in
+            # tests/test_composite.py, and a check run against a settings
+            # stub proves nothing about a deployment.
+            # stapel_core.django.settings.COMMON_MIDDLEWARE verbatim —
+            # spelled out because importing stapel_core.django pulls DRF in
+            # before settings.configure() has run. BootGateMiddleware first
+            # is the point: without it the E-gates never reach a gunicorn
+            # worker (stapel_core.boot.W002).
+            MIDDLEWARE=[
+                "stapel_core.django.boot.BootGateMiddleware",
+                "django.middleware.security.SecurityMiddleware",
+                "corsheaders.middleware.CorsMiddleware",
+                "django.contrib.sessions.middleware.SessionMiddleware",
+                "django.middleware.common.CommonMiddleware",
+                "stapel_core.django.jwt.middleware.CsrfExemptAPIMiddleware",
+                "django.middleware.csrf.CsrfViewMiddleware",
+                "django.contrib.auth.middleware.AuthenticationMiddleware",
+                "stapel_core.django.jwt.middleware.JWTAuthMiddleware",
+                "stapel_core.django.admin.redirect.AdminLoginRedirectMiddleware",
+                "stapel_core.django.jwt.middleware.ServiceAPIKeyMiddleware",
+                "django.contrib.messages.middleware.MessageMiddleware",
+                "django.middleware.clickjacking.XFrameOptionsMiddleware",
+            ],
+            TEMPLATES=[
+                {
+                    "BACKEND": "django.template.backends.django.DjangoTemplates",
+                    "APP_DIRS": True,
+                    "OPTIONS": {
+                        "context_processors": [
+                            "django.template.context_processors.request",
+                            "django.contrib.auth.context_processors.auth",
+                            "django.contrib.messages.context_processors.messages",
+                        ]
+                    },
+                }
+            ],
+            STATIC_URL="/static/",
+            # URL *names*, not root-relative paths: a mount prefix must not
+            # be able to 404 the login redirect (stapel_core.mounts.W001).
+            LOGIN_URL="admin:login",
+            LOGIN_REDIRECT_URL="admin:index",
             CACHES={
                 "default": {
                     "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -40,8 +93,34 @@ def pytest_configure(config):
             STAPEL_COMM={
                 "OUTBOX_ENABLED": False,
                 "ACTION_TRANSPORT": "inprocess",
+                # Screening runs in the web process here; a real deployment
+                # uses "action"/"bus" so task.requested leaves it.
+                "TASK_DISPATCH": "inline",
+                "TASK_EXECUTOR": "inline",
             },
+            # The Postgres backend is the module default and needs Postgres;
+            # this harness runs the naive engine on SQLite. The seam is
+            # stapel-search's to prove across engines (its own e2e runs both),
+            # not the composite's — what the composite must prove is that its
+            # source declaration round-trips through whichever engine is on.
+            STAPEL_SEARCH={
+                **preset.SETTINGS_DEFAULTS["STAPEL_SEARCH"],
+                "BACKEND": "stapel_search.backends.naive.NaiveSearchBackend",
+            },
+            STAPEL_MODERATION={
+                **preset.SETTINGS_DEFAULTS["STAPEL_MODERATION"],
+                # No LLM provider in a unit harness: screening is off, so a
+                # submitted listing waits for a human instead of hanging on a
+                # retry ladder against nothing.
+                "SCREEN_ENABLED": False,
+            },
+            STAPEL_REVIEWS=preset.SETTINGS_DEFAULTS["STAPEL_REVIEWS"],
+            STAPEL_LISTINGS={"REQUIRE_IMAGE_ON_PUBLISH": False},
         )
         import django
 
         django.setup()
+
+        from stapel_core.comm.schemas import autoload_schemas
+
+        autoload_schemas()

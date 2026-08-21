@@ -10,7 +10,7 @@
 [![license](https://img.shields.io/github/license/usestapel/stapel-classified)](https://github.com/usestapel/stapel-classified/blob/main/LICENSE)
 [![llms.txt](https://img.shields.io/badge/llms.txt-blue)](https://github.com/usestapel/stapel-classified/blob/main/docs/llms.txt)
 
-> Composite preset for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, with listing coordinates carried as the listing's own fields rather than a projection. Mounts no urls and writes no business logic beyond the shop composite's ListingReviewSummaryProjection (preset.py).
+> Composite preset for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation. Carries the cross-domain declarations no member is allowed to write: the `listing` search source (listings.search_documents/search_export -> SearchDocumentInput, invalidated by listing.*) and the `listing`/`review` moderation target policies, plus the shop composite's ListingReviewSummaryProjection. Listing coordinates are the listing's own fields, not a projection. Mounts no urls of its own.
 
 Part of the [Stapel framework](https://github.com/usestapel) — composable Django apps that deploy as a monolith or as microservices without changing module code.
 
@@ -26,7 +26,7 @@ pip install stapel-classified
 |---|---|
 | Version | `0.1.4` |
 | Python | `>=3.11` (3.11, 3.12, 3.13, 3.14) |
-| Fleet dependencies | [`stapel-attributes`](https://github.com/usestapel/stapel-attributes) · [`stapel-categories`](https://github.com/usestapel/stapel-categories) · [`stapel-geo`](https://github.com/usestapel/stapel-geo) · [`stapel-listings`](https://github.com/usestapel/stapel-listings) · [`stapel-reviews`](https://github.com/usestapel/stapel-reviews) |
+| Fleet dependencies | [`stapel-attributes`](https://github.com/usestapel/stapel-attributes) · [`stapel-categories`](https://github.com/usestapel/stapel-categories) · [`stapel-geo`](https://github.com/usestapel/stapel-geo) · [`stapel-listings`](https://github.com/usestapel/stapel-listings) · [`stapel-moderation`](https://github.com/usestapel/stapel-moderation) · [`stapel-notifications`](https://github.com/usestapel/stapel-notifications) (optional) · [`stapel-reviews`](https://github.com/usestapel/stapel-reviews) · [`stapel-search`](https://github.com/usestapel/stapel-search) |
 
 ## Documentation
 
@@ -52,12 +52,7 @@ from stapel_classified import preset
 
 INSTALLED_APPS = [
     # ... django/stapel-core baseline (incl. stapel_core.django.projections)
-    "stapel_categories",
-    "stapel_listings",
-    "stapel_reviews",
-    "stapel_shop",
-    "stapel_geo",
-    "stapel_classified",
+    *preset.INSTALLED_APPS,
 ]
 for _k, _v in preset.SETTINGS_DEFAULTS.items():
     globals().setdefault(_k, _v)
@@ -65,28 +60,52 @@ for _k, _v in preset.SETTINGS_DEFAULTS.items():
 # urls.py
 from django.urls import include, path
 
+from stapel_classified import preset
+
 urlpatterns = [
-    path("categories/", include("stapel_categories.urls")),
-    path("listings/", include("stapel_listings.urls")),
-    path("reviews/", include("stapel_reviews.urls")),
-    path("geo/", include("stapel_geo.urls")),
+    path(prefix, include(module)) for prefix, module in preset.URL_INCLUDES
 ]
 ```
+
+Mount from `preset.URL_INCLUDES` rather than by hand: `stapel-categories` and
+`stapel-listings` contribute only the `v1/` segment and belong under
+`<mod>/api/`, while `reviews`, `geo`, `search` and `moderation` bake `api/v1/`
+in themselves. Both end at `/<mod>/api/v1/...`, and getting it wrong is a
+`stapel_core.mounts.E004` refusal to boot, not a cosmetic difference.
 
 ## Config checklist (fill these, in the generated project's CONFIG.MD too)
 
 | Key | Note |
 |-----|------|
-| `STAPEL_REVIEWS["TARGET_TYPES"]` | prefilled by `stapel_classified.preset.SETTINGS_DEFAULTS` (targets `listing`) |
+| `STAPEL_REVIEWS["TARGET_TYPES"]` | prefilled by the preset (targets `listing`) |
+| `STAPEL_SEARCH["SOURCES"]` | prefilled by the preset (the `listing` source) |
+| `STAPEL_MODERATION["TARGET_TYPES"]` | prefilled by the preset (`listing` pre-publication, `review` post) |
+| `STAPEL_ACCESS["ROLES"]` | **yours** — the moderation console is staff-only; `preset.RECOMMENDED_ACCESS_ROLES` shows the shape |
+| `STAPEL_GDPR["DATA_OWNERS"]` | **yours** — must list `"moderation"`, or erasure never closes over complaint data |
+| `STAPEL_MODERATION["APPEAL_URL_TEMPLATE"]` | **yours** — an empty appeal link is what DSA Art. 17 notices |
+| `STAPEL_SEARCH["BACKEND"]` | defaults to Postgres; name `naive` or `meili` if that is not your engine |
 | `STAPEL_LISTINGS["BASE_CURRENCY"]` | default `USD` — set your currency |
 | `STAPEL_GEO[...]` | geocoder provider/keys — see stapel-geo CONFIG.MD |
 | listing coordinates | lat/lon are LISTING fields (no projection needed) — see stapel-listings |
 
 ## Glue
 
-None of its own beyond what stapel-shop already carries: coordinates are the
-listing's OWN fields (lat/lon on the listing), not a foreign aggregate — no
-projection needed for geo.
+Two members ship deliberately empty registries, because neither may know what
+a listing is. This package is the one place that knows both sides:
+
+- **`STAPEL_SEARCH["SOURCES"]["listing"]`** →
+  `stapel_classified.search_sources.listing_source`. Pulls documents through
+  `listings.search_documents` / `listings.search_export`, invalidated by
+  `listing.published` / `listing.updated` / `listing.removed`. Registering it
+  is also what wires the subscribers — you write no signal handler. Facets are
+  built from listings' `features_search` (stapel-search's declared lossy
+  fallback: attribute *range* filters do not work until listings serves DAOs).
+- **`STAPEL_MODERATION["TARGET_TYPES"]`** → `listing` (pre-publication:
+  `listing.submitted` opens the case and nothing is public until the verdict)
+  and `review` (post: live on arrival, a verdict is a takedown).
+
+Coordinates need no glue at all: they are the listing's OWN fields (lat/lon on
+the listing), not a foreign aggregate.
 
 ## License
 

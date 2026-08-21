@@ -27,6 +27,8 @@ jobs:
           pip install git+https://github.com/usestapel/stapel-core.git
           pip install git+https://github.com/usestapel/stapel-reviews.git
           pip install git+https://github.com/usestapel/stapel-shop.git
+          pip install git+https://github.com/usestapel/stapel-search.git@v0.1.0
+          pip install git+https://github.com/usestapel/stapel-moderation.git@v0.1.0
 
       - name: Install
         run: pip install -e ".[all]" || pip install -e .

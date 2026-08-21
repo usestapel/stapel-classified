@@ -1,7 +1,7 @@
 {
   "module": "stapel-classified",
   "version": "0.1.4",
-  "provides": "Composite preset for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, with listing coordinates carried as the listing's own fields rather than a projection. Mounts no urls and writes no business logic beyond the shop composite's ListingReviewSummaryProjection (preset.py).",
+  "provides": "Composite preset for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation. Carries the cross-domain declarations no member is allowed to write: the `listing` search source (listings.search_documents/search_export -> SearchDocumentInput, invalidated by listing.*) and the `listing`/`review` moderation target policies, plus the shop composite's ListingReviewSummaryProjection. Listing coordinates are the listing's own fields, not a projection. Mounts no urls of its own.",
   "axes": [],
   "extension_points": [],
   "operations_total": 0,
@@ -30,6 +30,21 @@
       "module": "stapel-attributes",
       "optional": false,
       "reason": "L1 library dependency of stapel-categories/stapel-listings; pip dependency, not a Django app (preset.py comment)"
+    },
+    {
+      "module": "stapel-search",
+      "optional": false,
+      "reason": "composite member — the index, facets and geo radius over listings; the composite declares its `listing` source (preset.py SETTINGS_DEFAULTS, search_sources.py)"
+    },
+    {
+      "module": "stapel-moderation",
+      "optional": false,
+      "reason": "composite member — the cross-target queue; the composite declares its `listing`/`review` target policies (preset.py SETTINGS_DEFAULTS)"
+    },
+    {
+      "module": "stapel-notifications",
+      "optional": true,
+      "reason": "not a member; when co-installed it routes the moderation letters (`listing_blocked`, `moderation.*`) the target policies name — absent, no letter is sent and nothing pretends one was"
     }
   ],
   "surface": []

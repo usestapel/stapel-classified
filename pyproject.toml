@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stapel-classified"
 version = "0.1.4"
-description = "Composite: classified ads — the shop composite + geo (location-bound listings)"
+description = "Composite: classified ads — the shop composite + geo + search + moderation"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-keywords = ["django", "stapel", "classified", "composite", "geo"]
+keywords = ["django", "stapel", "classified", "composite", "geo", "search", "moderation"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Framework :: Django",
@@ -24,10 +24,18 @@ classifiers = [
 ]
 # A composite introduces NO versions of its own — it pins the same ranges the
 # STAPEL_LIBS registry / each member lib already uses, fixing the combination.
+#
+# stapel-categories is pinned DIRECTLY, above the floor stapel-shop asks for:
+# the search source's category rollup is answered by `categories.path`, which
+# arrived in 0.5.6. Depending on it only transitively would let a resolver
+# pick 0.5.5 and leave every parent-category filter finding nothing.
 dependencies = [
-    "stapel-core>=0.10,<1.0",
-    "stapel-shop>=0.1,<0.2",
+    "stapel-core>=0.32,<1.0",
+    "stapel-shop>=0.2,<0.3",
+    "stapel-categories>=0.5.6,<0.6",
     "stapel-geo>=0.2,<0.4",
+    "stapel-search>=0.1,<0.2",
+    "stapel-moderation>=0.1,<0.2",
 ]
 
 [project.urls]
