@@ -194,6 +194,32 @@ def test_republishing_restores_it(published_listing):
     assert _keys(_query()) == {str(published_listing.pk)}
 
 
+def test_a_live_edit_republish_never_leaves_the_index(published_listing):
+    """listings 0.5.0: re-publishing a LIVE listing is not a takedown.
+
+    Before 0.5.0, ``publish_listing`` on an already-published listing set
+    ``status = pending`` past the FSM — no event, so the index never learned
+    and just kept serving a stale document — and even a fixed indexer would
+    have had nothing to invalidate on. Now the promoted content is visible
+    immediately (``status`` stays ``published``; only ``moderation_status``
+    goes back to ``pending``), so the listing must stay in the index across
+    the whole re-publish, and the edited content must be what is served —
+    not the pre-edit snapshot the takedown story would have frozen.
+    """
+    published_listing.title_draft = "Apple iPhone 13 Pro Max — mint, unlocked"
+    from stapel_listings.services.publish import publish_listing
+
+    publish_listing(published_listing)
+    published_listing.refresh_from_db()
+
+    assert published_listing.status == "published"
+    assert published_listing.moderation_status == "pending"
+
+    body = _query()
+    assert _keys(body) == {str(published_listing.pk)}
+    assert body["items"][0]["card"]["title"] == "Apple iPhone 13 Pro Max — mint, unlocked"
+
+
 # ── categories.path: the rollup that used to be degraded ─────────────
 
 

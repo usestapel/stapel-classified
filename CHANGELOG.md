@@ -120,18 +120,29 @@ test.
 | Pin | Was | Now | Why |
 |---|---|---|---|
 | `stapel-core` | `>=0.10,<1.0` | `>=0.32,<1.0` | the floor stapel-moderation requires; the old one let a resolver pick a core from before half these mechanisms existed |
-| `stapel-shop` | `>=0.1,<0.2` | `>=0.2,<0.3` | shop 0.2.1 is the release that follows listings 0.4; the composite was fixing an older combination than the fleet ships |
+| `stapel-shop` | `>=0.1,<0.2` | `>=0.2.2,<0.3` | shop 0.2.2 widens its own `stapel-listings` pin to admit 0.5, which is the follow-up below |
 | `stapel-categories` | (transitive) | `>=0.5.6,<0.6` | **direct**, above shop's floor: `categories.path` arrived in 0.5.6 and the search rollup is answered by it |
+| `stapel-listings` | (transitive, capped `<0.5` via shop 0.2.1) | `>=0.5,<0.6` | **direct**, for the same shape of reason as categories: `search_sources.listing_source()` imports `stapel_listings.models.INDEXED_STATUSES` by name, so this composite's own idea of "visible" is read straight off it |
 | `stapel-search` | — | `>=0.1,<0.2` | new member |
 | `stapel-moderation` | — | `>=0.1,<0.2` | new member |
 
-**`stapel-listings` stays at 0.4 for now, and this is a known follow-up.**
-Listings 0.5.0 (the re-moderation FSM: a live re-publish keeps
-`status=published` and rides the moderation axis alone) is on PyPI, but
-`stapel-shop` 0.2.1 caps `stapel-listings<0.5`, so pinning 0.5 here is
-literally unresolvable until shop widens. Verified against 0.4.0. The chain is
-shop → this composite, in that order; the report on 0.5.0's behaviour change
-(visibility retained during re-screening) belongs to the same follow-up.
+**The 0.4→0.5 follow-up named in the previous entry is now closed.** Listings
+0.5.0 changed re-publishing a live listing from a silent takedown
+(`status` assigned straight to `pending`, past the FSM, no event) to riding
+the moderation axis alone: `status` stays `published`, only
+`moderation_status` moves back to `pending`, and a rejecting verdict removes
+the listing through the same `published → blocked` edge a report-driven
+takedown uses. Verified end to end in this composite, not just read off the
+listings CHANGELOG — a live listing re-published through `publish_listing`
+stays in `Listing.objects.published()` *and* in the search answer while its
+fresh case is open, and only a `rejected` verdict empties both
+(`tests/test_search_source.py::test_a_live_edit_republish_never_leaves_the_index`,
+`tests/test_moderation_targets.py::test_a_live_republish_stays_visible_while_rescreened`,
+`tests/test_moderation_targets.py::test_a_rejecting_verdict_on_a_republish_still_takes_it_down`).
+Nothing else in 0.5.0 touches this composite: `search_sources.py`'s
+`visible_statuses` already read `INDEXED_STATUSES` by reference rather than
+copying it, so `published` staying indexed during re-screening required no
+code change here — only the pin, and the tests that pin the new promise.
 
 ### Known limitation — attribute facets are terms, not ranges
 

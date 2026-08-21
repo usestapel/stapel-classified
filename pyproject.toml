@@ -29,10 +29,19 @@ classifiers = [
 # the search source's category rollup is answered by `categories.path`, which
 # arrived in 0.5.6. Depending on it only transitively would let a resolver
 # pick 0.5.5 and leave every parent-category filter finding nothing.
+#
+# stapel-listings is pinned DIRECTLY too, for the same shape of reason:
+# `search_sources.listing_source()` imports `stapel_listings.models.
+# INDEXED_STATUSES` by name to build `visible_statuses`, so this composite
+# reads listings' re-moderation-keeps-it-visible behaviour (0.5.0) straight
+# off that set. Leaving the pin transitive would let a resolver settle on
+# whatever floor stapel-shop asks for and silently regress the seam this
+# composite is the one place that can prove.
 dependencies = [
     "stapel-core>=0.32,<1.0",
-    "stapel-shop>=0.2,<0.3",
+    "stapel-shop>=0.2.2,<0.3",
     "stapel-categories>=0.5.6,<0.6",
+    "stapel-listings>=0.5,<0.6",
     "stapel-geo>=0.2,<0.4",
     "stapel-search>=0.1,<0.2",
     "stapel-moderation>=0.1,<0.2",

@@ -168,6 +168,79 @@ def test_a_verdict_on_a_listing_also_leaves_the_search_index(published_listing, 
     assert body["items"] == []
 
 
+# ── listings 0.5.0: a live re-publish rides the moderation axis alone ─
+
+
+def test_a_live_republish_stays_visible_while_rescreened(published_listing):
+    """Editing a PUBLISHED listing must not repeat the pre-0.5.0 takedown.
+
+    listings 0.5.0 (CHANGELOG): re-publishing a live listing keeps
+    ``status == "published"`` — only ``moderation_status`` moves back to
+    ``pending`` — so the edit stays visible while a fresh case is worked,
+    instead of the listing silently vanishing from every public read for as
+    long as re-moderation takes. Both consumers in this composite (search's
+    ``visible_statuses`` and this test's own read of ``Listing.status``) see
+    the same thing: still there.
+    """
+    from django.test import Client
+
+    from stapel_listings.services.publish import publish_listing
+    from stapel_moderation.models import Case, OPEN_STATES
+
+    published_listing.title_draft = "Apple iPhone 13 Pro Max"
+    publish_listing(published_listing)
+    published_listing.refresh_from_db()
+
+    # The lifecycle did not move — only the moderation axis did.
+    assert published_listing.status == "published"
+    assert published_listing.moderation_status == "pending"
+
+    # A fresh case was opened (the submission case was already RESOLVED by
+    # the `published_listing` fixture's own approval) and it is still live.
+    case = Case.objects.get(
+        target_type="listing", target_key=str(published_listing.pk), state__in=OPEN_STATES
+    )
+    assert case.state in OPEN_STATES
+
+    # Still findable: the search source's `visible_statuses` is built from
+    # `INDEXED_STATUSES`, and `published` never left it.
+    body = Client().get("/search/api/v1/query", {"type": "listing"}).json()
+    assert {item["key"] for item in body["items"]} == {str(published_listing.pk)}
+
+
+def test_a_rejecting_verdict_on_a_republish_still_takes_it_down(published_listing):
+    """The re-publish itself is not the takedown — a rejecting verdict is.
+
+    Continuing the scenario above: once the fresh case resolves ``rejected``,
+    the listing goes down through the same ``published -> blocked`` edge a
+    report-driven takedown uses, and both consumers (status, search) agree
+    again.
+    """
+    from django.test import Client
+
+    from stapel_listings.services.publish import publish_listing
+    from stapel_moderation import services as moderation
+    from stapel_moderation.models import Case, CaseState, OPEN_STATES
+
+    publish_listing(published_listing)
+    published_listing.refresh_from_db()
+    assert published_listing.status == "published"  # still up, per the test above
+
+    case = Case.objects.get(
+        target_type="listing", target_key=str(published_listing.pk), state__in=OPEN_STATES
+    )
+    moderation.resolve_case(case, decision="rejected", reason_code="counterfeit")
+    case.refresh_from_db()
+    assert case.state == CaseState.RESOLVED
+
+    published_listing.refresh_from_db()
+    assert published_listing.status == "blocked"
+    assert published_listing.moderation_status == "rejected"
+
+    body = Client().get("/search/api/v1/query", {"type": "listing"}).json()
+    assert body["items"] == []
+
+
 def test_dismissing_a_report_leaves_the_listing_alone(published_listing, other_user):
     from stapel_moderation import services as moderation
 
