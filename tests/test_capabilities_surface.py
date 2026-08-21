@@ -66,11 +66,14 @@ def test_version_tracks_pyproject():
 
 def test_surface_is_declared_and_honestly_empty():
     """The composite has nothing to publish yet — that must be a stated
-    decision (an empty ``surface_roots`` list in the meta file), not an
-    absent one. If this module ever grows its own permission class, gate
-    function or template, this test is the one that will need updating
-    alongside the meta file — not a signal that something broke."""
+    decision (an empty ``surface_roots`` list plus a ``no_surface`` reason
+    in the meta file), not an absent one. ``patch_capabilities`` renders
+    that decision as an EMPTY ``surface`` list, not a missing key: absence
+    would look identical to a module that simply never declared one. If
+    this module ever grows its own permission class, gate function or
+    template, this test is the one that will need updating alongside the
+    meta file — not a signal that something broke."""
     meta = load_meta(REPO)
     assert meta.get("surface_roots") == []
     assert meta.get("surface") == {}
-    assert json.loads(COMMITTED.read_text()).get("surface") is None
+    assert json.loads(COMMITTED.read_text()).get("surface") == []
