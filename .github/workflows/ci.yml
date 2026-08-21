@@ -23,6 +23,18 @@ jobs:
       - name: Install unpublished member libs from git
         # Members not on PyPI yet — installed from git first so that
         # `pip install -e .` finds their requirement already satisfied.
+        #
+        # KNOWN RED, and named rather than hidden: this job cannot pass until
+        # an owner unblocks stapel-search. The repo is PRIVATE, so the clone
+        # below asks an unauthenticated runner for a username, and the package
+        # is not on PyPI either (its publish.yml fails `invalid-publisher`
+        # until the pending trusted publisher exists — same for
+        # stapel-moderation, whose repo is at least public). Two owner
+        # actions make this green, in either order: make usestapel/
+        # stapel-search public, or create both pending publishers so the
+        # `pip install -e .` pins resolve from PyPI and these two lines can be
+        # deleted. Skipping the step instead would turn a real "this
+        # combination cannot be built" into a green tick.
         run: |
           pip install git+https://github.com/usestapel/stapel-core.git
           pip install git+https://github.com/usestapel/stapel-reviews.git

@@ -2,12 +2,22 @@
 
 ## [Unreleased]
 
-**Release is blocked on an owner action, not on this work:** `stapel-search`
-0.1.0 and `stapel-moderation` 0.1.0 are tagged but not on PyPI (their
-`publish.yml` fails `invalid-publisher` until the pending trusted publishers
-exist). A composite whose pins cannot resolve from PyPI is unreleasable, so
-this sits in `[Unreleased]` with the wiring done and gated. CI installs both
-from git at `v0.1.0`, the way it already installs core/reviews/shop.
+**Release is blocked on owner actions, not on this work**, and CI on `main`
+is red for the same reason — named here rather than hidden behind a skip:
+
+1. `stapel-search` 0.1.0 and `stapel-moderation` 0.1.0 are tagged but **not on
+   PyPI** (their `publish.yml` fails `invalid-publisher` until the pending
+   trusted publishers exist), so this composite's pins cannot resolve for
+   anyone.
+2. **`usestapel/stapel-search` is a private repo**, so the git fallback CI
+   uses for unpublished members (the same trick that installs core/reviews/
+   shop) cannot clone it from an unauthenticated runner either.
+   `usestapel/stapel-moderation` is public and installs fine.
+
+Either action unblocks the build; both together let the two `pip install
+git+...` lines be deleted from `ci.yml`. Everything else is done and gated —
+the full suite, ruff, migration-lint, emit-check and contract-check are green
+locally against the tagged member releases.
 
 ### Added — search and moderation are members
 
