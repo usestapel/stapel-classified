@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Changed — pins admit `stapel-listings` 0.6 (the authz fix) via `stapel-shop` 0.2.3
+
+`stapel-listings>=0.5,<0.6` → `<0.7`; `stapel-shop>=0.2.2` → `>=0.2.3` (the
+shop release whose own pin stopped walling listings 0.6 out). This is what
+lets a fleet carry listings 0.6.2 — four authorization holes closed on the
+listing surface — instead of 0.5.0. The `listing` search source still reads
+`INDEXED_STATUSES` by name and nothing in 0.6.x renames it; verified in a
+clean venv on released shop 0.2.3 + listings 0.6.2 + reviews 0.3.0 (search
+and moderation from their v0.1.0 tags, as the fleet installs them): full
+suite green, `pip check` clean.
+
 **Release is blocked on owner actions, not on this work**, and CI on `main`
 is red for the same reason — named here rather than hidden behind a skip:
 
