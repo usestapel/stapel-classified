@@ -24,7 +24,7 @@ pip install stapel-classified
 
 | Fact | Value |
 |---|---|
-| Version | `0.1.4` |
+| Version | `0.1.5` |
 | Python | `>=3.11` (3.11, 3.12, 3.13, 3.14) |
 | Fleet dependencies | [`stapel-attributes`](https://github.com/usestapel/stapel-attributes) · [`stapel-categories`](https://github.com/usestapel/stapel-categories) · [`stapel-geo`](https://github.com/usestapel/stapel-geo) · [`stapel-listings`](https://github.com/usestapel/stapel-listings) · [`stapel-moderation`](https://github.com/usestapel/stapel-moderation) · [`stapel-notifications`](https://github.com/usestapel/stapel-notifications) (optional) · [`stapel-reviews`](https://github.com/usestapel/stapel-reviews) · [`stapel-search`](https://github.com/usestapel/stapel-search) |
 

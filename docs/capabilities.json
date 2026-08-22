@@ -1,6 +1,6 @@
 {
   "module": "stapel-classified",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "provides": "Composite preset for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation. Carries the cross-domain declarations no member is allowed to write: the `listing` search source (listings.search_documents/search_export -> SearchDocumentInput, invalidated by listing.*) and the `listing`/`review` moderation target policies, plus the shop composite's ListingReviewSummaryProjection. Listing coordinates are the listing's own fields, not a projection. Mounts no urls of its own.",
   "axes": [],
   "extension_points": [],

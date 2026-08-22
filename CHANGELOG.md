@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-08-23
+
 ### Changed — pins admit `stapel-listings` 0.6 (the authz fix) via `stapel-shop` 0.2.3
 
 `stapel-listings>=0.5,<0.6` → `<0.7`; `stapel-shop>=0.2.2` → `>=0.2.3` (the
@@ -13,22 +15,11 @@ clean venv on released shop 0.2.3 + listings 0.6.2 + reviews 0.3.0 (search
 and moderation from their v0.1.0 tags, as the fleet installs them): full
 suite green, `pip check` clean.
 
-**Release is blocked on owner actions, not on this work**, and CI on `main`
-is red for the same reason — named here rather than hidden behind a skip:
-
-1. `stapel-search` 0.1.0 and `stapel-moderation` 0.1.0 are tagged but **not on
-   PyPI** (their `publish.yml` fails `invalid-publisher` until the pending
-   trusted publishers exist), so this composite's pins cannot resolve for
-   anyone.
-2. **`usestapel/stapel-search` is a private repo**, so the git fallback CI
-   uses for unpublished members (the same trick that installs core/reviews/
-   shop) cannot clone it from an unauthenticated runner either.
-   `usestapel/stapel-moderation` is public and installs fine.
-
-Either action unblocks the build; both together let the two `pip install
-git+...` lines be deleted from `ci.yml`. Everything else is done and gated —
-the full suite, ruff, migration-lint, emit-check and contract-check are green
-locally against the tagged member releases.
+Every member resolves from PyPI now (stapel-search 0.1.0, stapel-moderation
+0.1.0 published 2026-08-23), so the `pip install git+...` fallback is gone
+from `ci.yml` and this is the first release whose `requires_dist` names the
+composite that actually ships — the 0.1.4 wheel still read `stapel-shop<0.2`
+and knew neither search nor moderation.
 
 ### Added — search and moderation are members
 
