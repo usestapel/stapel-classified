@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.2.0"
+version = "0.2.1"
 description = "Composite: classified ads — the shop composite + geo + search + moderation"
 readme = "README.md"
 license = { text = "MIT" }
@@ -44,7 +44,7 @@ dependencies = [
     "stapel-listings>=0.5,<0.8",
     "stapel-geo>=0.2,<0.4",
     "stapel-search>=0.2.2,<0.3",
-    "stapel-moderation>=0.2,<0.3",
+    "stapel-moderation>=0.2,<0.4",
 ]
 
 [project.urls]

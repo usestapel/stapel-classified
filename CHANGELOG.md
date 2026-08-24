@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-08-24
+
+### Changed — the moderation pin admits 0.3
+
+`stapel-moderation>=0.2,<0.3` → `<0.4`. moderation 0.3.0 shipped hours after
+0.2.0 (the case card's `content` becomes a declared field of the DTO instead
+of a key grafted onto the response, `can_view_content` finally receives the
+asking moderator's id, and four refusals that could never be produced start
+mapping to their own keys). Nothing this composite calls changed, and the
+whole composite suite — 101 tests, every member co-installed — is green
+against 0.3.0.
+
+Pre-1.0 house semver reads a minor as breaking, so `<0.3` was the honest pin
+to publish 0.2.0 under. Leaving it there for a day would have made a project
+that wants moderation 0.3.0 unable to install this composite at all, which is
+a resolver conflict manufactured out of caution rather than evidence.
+
+
 ## [0.2.0] — 2026-08-24
 
 The owner opened the live product's chat and could not tell **who** he was
