@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-08-24
+
+### Changed — pins admit `stapel-search` 0.2.2 (the geo prefilter fix)
+
+`stapel-search>=0.1,<0.2` → `>=0.2.2,<0.3`. The postgres search backend was
+ANDing `geohash LIKE 'prefix%'` unconditionally while listings carry an
+empty geohash, so radius search returned *fewer* results the closer you
+searched (live: radius=50km → 0 results, radius=500km → 3, nearest actually
+11.67km away). 0.2.2 fixes the prefilter; this release is what lets a fleet
+carry it instead of the broken 0.1.x line. Verified in a clean venv on
+released search 0.2.2 (installed over the shared workspace venv's existing
+member versions): full composite suite green (50 passed), no new `pip
+check` conflicts introduced by the search pin.
+
 ## [0.1.5] — 2026-08-23
 
 ### Changed — pins admit `stapel-listings` 0.6 (the authz fix) via `stapel-shop` 0.2.3
