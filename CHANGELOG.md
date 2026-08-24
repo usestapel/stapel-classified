@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [0.1.8] — 2026-08-24
+
+### Changed — pins admit `stapel-listings` 0.7 (the geohash-stamp fix)
+
+`stapel-listings>=0.5,<0.7` → `<0.8`. This is the release that lets a fleet
+carry **listings 0.7.1** — `Listing.save()` now stamps `geohash`/
+`geohash_draft` via `geo.geohash_encode`, plus the one-time
+`listings_backfill_geohash` management command for rows written before the
+fix. Until now every listing carried `geohash=""`, so search 0.2.2's
+geohash prefilter (0.1.7's own reason for existing) had nothing to
+prefilter against and every geo-filtered query fell back to a full box
+scan — correct, not fast.
+
+`search_sources.listing_source()` still reads `stapel_listings.models.
+INDEXED_STATUSES` by name and 0.7.x does not touch it; 0.7.0's only change
+was an additive route (`GET my/listings/`) this composite does not call.
+This composite's own `stapel-shop` pin (`>=0.2.3,<0.3`) is unchanged — shop
+0.2.4 (which itself widens to admit listings 0.7) satisfies it without a
+bump here. Verified in a clean venv on released listings 0.7.1: full
+composite suite green (50 passed).
+
 ## [0.1.7] — 2026-08-24
 
 ### Changed — pins admit `stapel-search` 0.2.2 (the geo prefilter fix)
