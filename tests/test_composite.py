@@ -70,9 +70,10 @@ def test_system_checks_report_no_errors():
     and the category-path provider, core's mount canon over the URLconf).
     Booting them together is the only way to run them.
 
-    Two warnings are expected here and are properties of the harness, not of
-    the composite: ``access.W005`` (no stapel-auth, so no step-up factor) and
-    ``blacklist.W002`` (LocMemCache). Anything else — and any ERROR at all —
+    Three warnings are expected here and are properties of the harness, not
+    of the composite: ``access.W005`` (no stapel-auth, so no step-up factor),
+    ``blacklist.W002`` (LocMemCache) and ``chat.W001`` (one scope, because a
+    marketplace is not multi-tenant). Anything else — and any ERROR at all —
     fails.
     """
     from django.core.checks import Error, run_checks
@@ -97,8 +98,13 @@ def test_system_checks_report_no_errors():
             #     (stapel-profiles owns the relationship and publishes no
             #     comm read of it) and the whole point of the check is that a
             #     deployment is told at every boot instead of assuming.
+            #   chat.W001 — every conversation lives in the single default
+            #     scope. A marketplace is not multi-tenant, so that is the
+            #     right answer here and stapel-workspaces is deliberately not
+            #     in this host.
             "stapel_moderation.W006",
             "stapel_classified.W001",
+            "stapel_chat.W001",
         )
     ]
     assert unexpected == [], [str(f) for f in unexpected]

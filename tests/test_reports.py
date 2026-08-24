@@ -8,9 +8,11 @@ because the fleet serves their content differently:
 - a **seller** has no ``profiles.moderation_content`` anywhere — so this
   composite serves the marketplace-shaped answer itself (display name,
   rating, the seller's own id as author);
-- a **message** has no owner at all: stapel-chat stores it and serves nothing,
-  so the report carries the reporter's attestation (stapel-moderation 0.2.0's
-  evidence seam) and only the two people in the thread may file one.
+- a **message** is served by its owner since stapel-chat 0.5.0
+  (``chat.moderation_content``), keyed by this composite's
+  ``<conversation_id>:<message_id>``, and only the two people in the thread
+  may file one. It was evidence-based until then — the reporter's own
+  snapshot, stamped unverified — because nobody served a message at all.
 
 And one negative claim, asserted rather than promised: this package holds no
 queue of its own.
@@ -30,6 +32,23 @@ def _bind(listing, buyer):
         conversation_id=conversation, listing_key=listing.pk, actor_id=buyer.pk
     )
     return conversation
+
+
+def _thread(listing, buyer, seller, *, body="Send the deposit to my card."):
+    """A REAL chat thread about ``listing``, bound here, one message in it.
+
+    The message is the SELLER's, so the buyer reporting it is not reporting
+    themselves. Returns the conversation, the message, and the composite key
+    a report names it by.
+    """
+    from stapel_chat import services as chat
+
+    conversation = chat.create_direct(owner=buyer, other_user_id=seller.pk)
+    services.bind_listing_conversation(
+        conversation_id=conversation.id, listing_key=listing.pk, actor_id=buyer.pk
+    )
+    message = chat.post_message(conversation=conversation, sender=seller, body=body)
+    return conversation, message, f"{conversation.id}:{message.id}"
 
 
 # ── There is exactly one queue, and it is moderation's ───────────────
@@ -107,33 +126,98 @@ def test_you_cannot_report_yourself_as_a_seller(published_listing, user):
 # ── Reporting a chat message ─────────────────────────────────────────
 
 
-def test_a_party_may_report_a_message_with_their_own_snapshot(
+def test_a_party_may_report_a_message_and_the_platform_reads_it(
     published_listing, other_user, user
 ):
+    """The composite key travels whole, and what comes back is the message.
+
+    Both halves matter and both are used: this package answers WHO may file
+    off the conversation half, and chat answers WHAT was said off the message
+    half — under chat's own id spelling, ``message_id``.
+    """
     from stapel_moderation import services as moderation
 
-    conversation = _bind(published_listing, other_user)
-    target_key = f"{conversation}:{uuid.uuid4()}"
+    conversation, message, target_key = _thread(published_listing, other_user, user)
 
     report, case = moderation.submit_report(
         target_type="chat_message",
         target_key=target_key,
         reporter_id=other_user.pk,
         reason_code="off_platform_payment",
-        evidence={
-            "text": "Send the deposit to my card, we settle off-site.",
-            "author_id": str(user.pk),
-            "conversation_id": str(conversation),
-        },
     )
     assert case.target_type == "chat_message"
-    assert report.evidence["text"].startswith("Send the deposit")
+    # No attestation: a served target needs none, and moderation refuses one
+    # (see the next test).
+    assert report.evidence == {}
+    # What an attestation could never establish: the case names the message's
+    # real author, which is who a Sanction can be issued against.
+    assert str(case.subject_user_id) == str(user.pk)
 
     content = moderation.fetch_content("chat_message", target_key)
-    # Marked as an attestation, always: nobody in the fleet can confirm who
-    # wrote a message no service serves.
-    assert content.extra["source"] == "evidence"
-    assert content.extra["verified"] is False
+    assert content.text == "Send the deposit to my card."
+    assert content.author_id == str(user.pk)
+    assert content.extra["conversation_id"] == str(conversation.id)
+    # A platform read, not a quote: nothing here is stamped unverified.
+    assert "source" not in content.extra
+
+    # And it is read LIVE — an edit after the complaint is what a moderator
+    # sees, which is the whole reason the content is fetched and not stored.
+    from stapel_chat import services as chat
+
+    chat.edit_message(message=message, editor=user, body="Ignore that, sorry.")
+    assert moderation.fetch_content("chat_message", target_key).text == (
+        "Ignore that, sorry."
+    )
+
+
+def test_a_snapshot_is_refused_now_that_the_message_itself_is_served(
+    published_listing, other_user, user
+):
+    """The inverse of what this test asserted while the target was
+    evidence-based: a reporter's snapshot next to a live content function is
+    a second, staler answer, and moderation refuses it rather than keeping
+    two versions of what was said (``moderation_evidence_invalid``)."""
+    from stapel_moderation import services as moderation
+
+    _conversation, _message, target_key = _thread(published_listing, other_user, user)
+
+    with pytest.raises(ValueError, match="evidence_invalid"):
+        moderation.submit_report(
+            target_type="chat_message",
+            target_key=target_key,
+            reporter_id=other_user.pk,
+            reason_code="off_platform_payment",
+            evidence={"text": "what I say they said"},
+        )
+
+
+def test_a_message_quoted_under_the_wrong_conversation_is_not_the_target(
+    published_listing, other_user, user
+):
+    """Both halves of the composite key must agree.
+
+    The reporter IS a party of the conversation they named, so this package
+    lets the report through — and chat still refuses, because the message is
+    not in that thread. Mislabelling somebody else's thread buys nothing.
+    """
+    from stapel_chat import services as chat
+    from stapel_moderation import services as moderation
+
+    _conversation, message, _key = _thread(published_listing, other_user, user)
+    other_thread = chat.create_group(owner=other_user)
+    services.bind_listing_conversation(
+        conversation_id=other_thread.id,
+        listing_key=published_listing.pk,
+        actor_id=other_user.pk,
+    )
+
+    with pytest.raises(moderation.TargetNotFound):
+        moderation.submit_report(
+            target_type="chat_message",
+            target_key=f"{other_thread.id}:{message.id}",
+            reporter_id=other_user.pk,
+            reason_code="spam",
+        )
 
 
 def test_an_outsider_cannot_report_a_message_from_a_thread_they_are_not_in(
@@ -160,7 +244,6 @@ def test_an_outsider_cannot_report_a_message_from_a_thread_they_are_not_in(
             target_key=f"{conversation}:{uuid.uuid4()}",
             reporter_id=stranger.pk,
             reason_code="spam",
-            evidence={"text": "whatever"},
         )
 
 
@@ -177,16 +260,19 @@ def test_a_malformed_or_unbound_message_key_fails_closed(other_user):
                 target_key=target_key,
                 reporter_id=other_user.pk,
                 reason_code="spam",
-                evidence={"text": "whatever"},
             )
 
 
-def test_a_message_report_with_no_snapshot_is_refused(
+def test_a_message_chat_has_no_copy_of_is_a_404_not_a_503(
     published_listing, other_user
 ):
-    """An evidence-based target with no attestation has nothing to show a
-    moderator, and 404 is the honest answer: nothing is down, there is
-    nothing to look at."""
+    """A deleted, erased or invented message is GONE, not unavailable.
+
+    chat raises its ``MessageNotFound`` (a ``LookupError`` — the
+    ``*.moderation_content`` family's spelling), and moderation must tell
+    that apart from "the owner could not answer", or a reporter is told their
+    target does not exist because a sibling service restarted.
+    """
     from stapel_moderation import services as moderation
 
     conversation = _bind(published_listing, other_user)
@@ -207,18 +293,17 @@ def test_the_report_and_the_block_are_two_calls_and_neither_undoes_the_other(
     boundary — and the thread survives both."""
     from stapel_moderation import services as moderation
 
-    conversation = _bind(published_listing, other_user)
+    conversation, _message, target_key = _thread(published_listing, other_user, user)
     moderation.submit_report(
         target_type="chat_message",
-        target_key=f"{conversation}:{uuid.uuid4()}",
+        target_key=target_key,
         reporter_id=other_user.pk,
         reason_code="harassment",
         description="Threats.",
-        evidence={"text": "…", "author_id": str(user.pk)},
     )
     blocks_double["blocked"].add(frozenset((str(other_user.pk), str(user.pk))))
 
-    context = services.conversation_context(conversation, viewer_id=other_user.pk)
+    context = services.conversation_context(conversation.id, viewer_id=other_user.pk)
     assert context["subject"]["listing"]["title"] == "Apple iPhone 13 Pro"
 
 

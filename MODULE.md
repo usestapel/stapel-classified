@@ -7,6 +7,12 @@ STATE — that no member is allowed to write.
 Members: **shop** (categories + attributes + listings + reviews) + **geo** +
 **search** + **moderation**.
 
+**stapel-chat is pinned but is not a member.** Nothing here imports it and
+the preset mounts none of it; the pin (`>=0.5`) exists because the
+`chat_message` moderation target names `chat.moderation_content`, which
+arrived in chat 0.5.0. Mounting chat stays a host's decision — the pin only
+fixes which chat a deployment that has one must be on.
+
 ## What a composite may own
 
 The law used to be quoted as "a composite writes no business logic and mounts
@@ -129,17 +135,31 @@ answers because the fleet serves their content differently:
   the fleet applies a verdict to an account, and the consequence of a case
   about a person is a `Sanction`, which moderation issues itself against
   core's cross-service blacklist.
-- **`chat_message`** — **evidence-based** (stapel-moderation 0.2.0). Nobody
-  serves a chat message's content and nowhere in the fleet is one stored that
-  this package could reach, so the report carries the reporter's own snapshot
-  and it is rendered to moderators as an attestation, never as a platform
-  read. Its key is `<conversation_id>:<message_id>` — the composite key is
-  not decoration: with the conversation in it, `classified.can_report_message`
-  can answer off the join table whether the reporter was in the thread at
-  all, which turns "only the two people in a conversation may report what was
-  said in it" into a server rule. It fails CLOSED, unlike moderation's
-  fail-open default for a missing callback (right for a public listing, wrong
-  for a private thread).
+- **`chat_message`** — content served by its owner, `chat.moderation_content`
+  (stapel-chat 0.5.0). It was **evidence-based** until 0.3.0 because nobody
+  served a message at all: the report carried the reporter's own snapshot and
+  moderators read it as an attestation, never as a platform read. Now a
+  moderator reads the message itself, fetched when the case is opened so an
+  edit made after the complaint is visible, and — the thing an attestation
+  could never establish — the case names the message's real **author**, which
+  is who a Sanction is issued against. Declaring both a `content_function`
+  and `evidence` is moderation.E007, so the flag went with the flip; nothing
+  migrated, because nothing here ever stored a message.
+
+  Its key is still `<conversation_id>:<message_id>`, and now BOTH halves do
+  work. The conversation half is what lets `classified.can_report_message`
+  answer off the join table whether the reporter was in the thread at all —
+  "only the two people in a conversation may report what was said in it" as a
+  server rule, failing CLOSED, unlike moderation's fail-open default for a
+  missing callback (right for a public listing, wrong for a private thread).
+  The message half is what chat reads, and chat refuses a message quoted
+  under a conversation it does not belong to, so the same key is checked
+  again on the far side of the seam.
+
+  This is why `stapel-chat>=0.5` is pinned although nothing here imports it
+  and the preset mounts none of it: on chat 0.4 the content read has no
+  provider and every complaint about a message answers 503. Where a host
+  mounts no chat at all, moderation.W006 says so at every boot.
 
 `profile` is deliberately still absent: stapel-profiles is not a member and
 serves no `profiles.moderation_content`, so a policy for it would point at a
@@ -196,9 +216,10 @@ gaps to paper over. Each has a working, honest behaviour in the meantime.
    limitations*.
 5. **Block enforcement at send.** A block that only stops NEW conversations
    is half a block; the send path is chat's.
-6. **`chat.moderation_content`.** With it, `chat_message` stops being
-   evidence-based and becomes one line of policy — no migration here,
-   because nothing here stores a message.
+6. ~~**`chat.moderation_content`.**~~ **Shipped in stapel-chat 0.5.0 and
+   adopted in 0.3.0** — the ask is kept here, struck through, because the
+   prediction it was written as ("one line of policy, no migration") is worth
+   being able to check against what actually happened.
 
 ### stapel-profiles (0.15.0 today)
 
@@ -230,10 +251,12 @@ mounts nothing.
   card and a public seller card, i.e. what the listing page already shows.
   What it does buy is mislabelling somebody else's thread, and that closes
   the day chat can answer who is in one.
-- **`chat_message` evidence is an attestation.** The composite key narrows
-  WHO may file (a party of the thread), which is the strongest available
-  answer; the message text and its author remain what the reporter says they
-  saw, and moderation renders them as such.
+- **A `chat_message` report needs chat in the deployment.** The content read
+  is `chat.moderation_content`; where no process serves it, a complaint about
+  a message answers 503 rather than falling back to the reporter's word for
+  it. That is deliberate — a silent fallback to an attestation would put two
+  kinds of "what was said" behind one card — and it is announced at boot
+  (moderation.W006), not discovered in the queue.
 - **The seller card is `partial` in every deployment today.** See the routed
   ask above; the payload names the missing function rather than leaving a
   blank a client would have to guess about.

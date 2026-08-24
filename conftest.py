@@ -11,6 +11,17 @@ def pytest_configure(config):
         # own SETTINGS_DEFAULTS are the settings under test — the point of
         # this harness is that the composite's declarations actually wire up
         # against the real member modules, not that they parse.
+        #
+        # stapel_chat (+ stapel_realtime, its WebSocket substrate) is NOT a
+        # member of this composite: it owns no part of the preset, and
+        # ConversationSubject exists precisely because chat may not know what
+        # a listing is. It is mounted HERE because the `chat_message` target
+        # type now names `chat.moderation_content` as its content function,
+        # and this file's own rule is that a double on either side of a seam
+        # is the one thing that cannot prove it. Mounting chat brings its
+        # deployment checks (E010-E014) with it, which is why the realtime
+        # settings below are real — the mirror of stapel-chat's own harness,
+        # which mounts stapel_moderation for exactly this reason.
         from stapel_classified import preset
 
         settings.configure(
@@ -31,6 +42,11 @@ def pytest_configure(config):
                 "stapel_shop",
                 "stapel_search",
                 "stapel_moderation",
+                # In INSTALLED_APPS because it carries the system checks and
+                # registers the "channels" signal transport from its
+                # AppConfig.ready() — the two lines a host with chat writes.
+                "stapel_realtime",
+                "stapel_chat",
                 "stapel_classified",
             ],
             AUTH_USER_MODEL="users.User",
@@ -97,6 +113,23 @@ def pytest_configure(config):
                 # uses "action"/"bus" so task.requested leaves it.
                 "TASK_DISPATCH": "inline",
                 "TASK_EXECUTOR": "inline",
+                # stapel-chat's ephemeral frames (typing, receipts, the inbox
+                # stream) ride this one; without it they are dropped silently
+                # and chat says so as E013.
+                "SIGNAL_TRANSPORT": "channels",
+            },
+            # In-memory layer: enough for a single-process run, and what
+            # stapel-chat's own harness uses (E011 wants a 'default').
+            CHANNEL_LAYERS={
+                "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+            },
+            STAPEL_REALTIME={
+                # Exact origins, ports included — an entry without the port
+                # is an allowlist that silently never matches (realtime.E003),
+                # and an empty one is cross-site WebSocket hijacking of a live
+                # conversation where the socket authenticates by cookie
+                # (stapel_chat.E014).
+                "ALLOWED_ORIGINS": ["http://testserver"],
             },
             # The Postgres backend is the module default and needs Postgres;
             # this harness runs the naive engine on SQLite. The seam is

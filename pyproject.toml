@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.2.1"
+version = "0.3.0"
 description = "Composite: classified ads — the shop composite + geo + search + moderation"
 readme = "README.md"
 license = { text = "MIT" }
@@ -30,6 +30,22 @@ classifiers = [
 # arrived in 0.5.6. Depending on it only transitively would let a resolver
 # pick 0.5.5 and leave every parent-category filter finding nothing.
 #
+# stapel-moderation's floor is raised to 0.3 by the same target: a chat
+# message is the first target here whose content is PRIVATE, and 0.3.0 is the
+# release where `can_view_content` is asked on behalf of the moderator
+# actually looking (it passed actor_id=None before) and where the card's
+# `content` is a declared field of the contract rather than a graft onto the
+# response dict.
+#
+# stapel-chat is pinned even though this package imports nothing from it and
+# mounts none of it: the `chat_message` moderation target names
+# `chat.moderation_content`, which arrived in chat 0.5.0, and
+# `submit_report` resolves a message's author through it. On chat 0.4 every
+# complaint about a message answers 503 — a resolver error is a much better
+# place to learn that than a moderator's queue. Mounting chat is still the
+# host's decision; the pin only fixes WHICH chat a deployment that has one
+# must be on.
+#
 # stapel-listings is pinned DIRECTLY too, for the same shape of reason:
 # `search_sources.listing_source()` imports `stapel_listings.models.
 # INDEXED_STATUSES` by name to build `visible_statuses`, so this composite
@@ -44,7 +60,8 @@ dependencies = [
     "stapel-listings>=0.5,<0.8",
     "stapel-geo>=0.2,<0.4",
     "stapel-search>=0.2.2,<0.3",
-    "stapel-moderation>=0.2,<0.4",
+    "stapel-moderation>=0.3,<0.4",
+    "stapel-chat>=0.5,<0.6",
 ]
 
 [project.urls]

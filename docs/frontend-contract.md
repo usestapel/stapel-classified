@@ -3,8 +3,8 @@
 > Written for the agent building the classified pair in the stapel-react
 > monorepo (the chat screen, the conversation list, the report dialog and
 > the block affordance). This is the server side of "with whom, and about
-> what". Backend version: **stapel-classified 0.2.0**, alongside
-> **stapel-chat 0.4.0** and **stapel-moderation 0.2.0**.
+> what". Backend version: **stapel-classified 0.3.0**, alongside
+> **stapel-chat 0.5.0** and **stapel-moderation 0.3.0**.
 
 ## 0. Why this document exists
 
@@ -264,7 +264,7 @@ The four target types and what they take:
 | `listing` | the listing id | — |
 | `review` | the review id | — |
 | `seller` | the seller's user id | — |
-| `chat_message` | **`"<conversation_id>:<message_id>"`** | `evidence` (§4.3) |
+| `chat_message` | **`"<conversation_id>:<message_id>"`** | — (§4.3) |
 
 ### 4.2 Filing one
 
@@ -289,43 +289,41 @@ Refusals worth their own copy: `409 error.409.moderation_already_reported`
 ("you already reported this"), `400 error.400.moderation_own_content`,
 `403 error.403.moderation_cannot_report`.
 
-### 4.3 Reporting a message needs the message
+### 4.3 Reporting a message is just the key
 
-Nobody in the fleet serves a chat message's content — stapel-chat stores it
-and publishes no read for it — so the report carries **your snapshot** of it:
+**Changed in classified 0.3.0 — if you built the evidence dialog described
+here before, delete it.** stapel-chat 0.5.0 serves the message
+(`chat.moderation_content`), so the platform reads it itself and a report is
+the same shape as every other one:
 
 ```jsonc
 {
   "target_type": "chat_message",
   "target_key": "3fa85f64-5717-4562-b3fc-2c963f66afa6:9c1e…",
-  "reason_code": "off_platform_payment",
-  "evidence": {
-    "text": "Send the deposit to my card, we settle off-site.",
-    "author_id": "5cc26b64-…",     // take it from the header's counterparty!
-    "conversation_id": "3fa85f64-…",
-    "sent_at": "2026-08-24T10:00:00+00:00"
-  }
+  "reason_code": "off_platform_payment"
 }
 ```
 
-Three rules:
+Two rules:
 
-1. **`target_key` is composite** — `conversation_id:message_id`. Without the
-   conversation the server cannot tell whether you were even in the thread,
-   and the check that only the two parties may report a message runs off it.
-   A bare message id answers `403 error.403.moderation_cannot_report`.
-2. **`author_id` comes from the header's `counterparty.user_id`**, not from
-   whatever your local message cache says. A direct thread has two people and
-   you are one of them, so the author of a message you are reporting is the
-   other one — take the server-derived value.
-3. **Send the message text.** An `evidence`-less report answers
-   `404 error.404.moderation_target_not_found`: there is nothing for a
-   moderator to look at. Keep it small — the whole blob is bounded (8 KB by
-   default) and an oversized one is **refused**, not truncated
-   (`400 error.400.moderation_evidence_invalid`).
+1. **`target_key` is composite** — `conversation_id:message_id`. Both halves
+   are used: without the conversation the server cannot tell whether you were
+   even in the thread, and the check that only the two parties may report a
+   message runs off it (a bare message id answers
+   `403 error.403.moderation_cannot_report`); the message half is what chat
+   reads, and a message quoted under a conversation it does not belong to
+   answers `404 error.404.moderation_target_not_found`.
+2. **Send no `evidence`.** It is now refused —
+   `400 error.400.moderation_evidence_invalid` — because a snapshot beside a
+   live read is a second, staler answer to what was said. There is nothing
+   for the user to copy, paste or attach: drop the field, and with it the
+   "author_id from the header's counterparty" step the old flow needed.
 
-Evidence is rendered to moderators as an attestation ("reported as"), never
-as content the platform read. Say so in the dialog: it is your quote.
+Two consequences worth putting in the dialog copy: a moderator sees the
+message **as it is when they open the case** (an edit made after you report
+is what they read), and a message deleted or erased before then answers
+`404` — a tombstone is gone, not blank, and a moderation case is not the one
+place erased text survives.
 
 ## 5. Blocking
 
@@ -381,7 +379,6 @@ that is coming instead of inventing its own:
 | `conversation.created` event / a server-side create function | stapel-chat | The client creates in chat, then binds here. Do not try to bind from a server. |
 | Block enforcement on message send | stapel-chat + stapel-profiles | Hide the composer for a blocked pair, knowing it is not enforcement. |
 | A public-profile comm read (avatar, member-since, seller type) | stapel-profiles | Initials placeholder; `meta_reason: "profile_unavailable"`. |
-| A chat message content read | stapel-chat | Reporter-supplied `evidence` (§4.3). |
 | Seller ratings | deployment | `rating: null` unless the deployment registers a seller review target. |
 
 Never paper over one of these by reading another service's REST from a

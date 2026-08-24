@@ -242,21 +242,27 @@ SETTINGS_DEFAULTS = {
                 "media": False,
             },
             "chat_message": {
-                # EVIDENCE-BASED (stapel-moderation 0.2.0). stapel-chat
-                # serves no `chat.moderation_content` and stores no copy of a
-                # message anywhere this module could reach, so the report
-                # carries the reporter's own snapshot and that is what a
-                # moderator reads. Everything about it is marked unverified
-                # in the card; see stapel-moderation's MODULE.md for the
-                # exact limits of an attestation.
+                # Served by stapel-chat since its 0.5.0. Until then this was
+                # EVIDENCE-BASED — the reporter's own snapshot, stamped
+                # unverified, because no module in the fleet served a
+                # message's content. `chat.moderation_content` ends that: a
+                # moderator reads the message itself, as it is at the moment
+                # the case is opened, edits included, and the author it names
+                # is what a sanction can be hung on. Declaring BOTH a
+                # content_function and `evidence` is moderation.E007, so the
+                # flag goes with the flip; nothing migrates, because nothing
+                # here ever stored a message.
                 #
-                # The day stapel-chat ships a content function this entry
-                # becomes {"content_function": "chat.moderation_content"} and
-                # the evidence flag goes — one line, no migration, because
-                # nothing here stores the message.
+                # The id spelling is chat's own (`message_id`), and the VALUE
+                # stays this composite's composite key
+                # `<conversation_id>:<message_id>` — chat splits it and
+                # refuses a message quoted under somebody else's
+                # conversation, so the key that makes `can_report` answerable
+                # below is also checked on the read.
                 "gate": "post",
                 "intake_events": [],
-                "evidence": True,
+                "id_field": "message_id",
+                "content_function": "chat.moderation_content",
                 # Only the two people in the thread may complain about what
                 # was said in it. moderation's default for a missing callback
                 # is fail-OPEN, which is right for a public listing and wrong
@@ -282,9 +288,9 @@ SETTINGS_DEFAULTS = {
                     "impersonation",
                     "other",
                 ],
-                # Screening reads the attestation, which is text; a chat
-                # attachment's bytes live in the CDN and are not quoted into
-                # a report.
+                # A message's attachments travel as opaque CDN KEYS, not
+                # bytes: feeding them to a vision screener would only buy a
+                # refusal.
                 "media": False,
             },
         },

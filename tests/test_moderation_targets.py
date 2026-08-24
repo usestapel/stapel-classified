@@ -74,15 +74,27 @@ def test_the_seller_target_serves_its_own_content():
     assert answer["author_id"] == "u-1"
 
 
-def test_the_chat_message_target_is_evidence_based():
-    """No module in the fleet serves a chat message's content, so a report
-    carries the reporter's snapshot — stapel-moderation 0.2.0's evidence
-    seam, which exists for exactly this shape of target."""
+def test_the_chat_message_target_reads_the_message_from_chat():
+    """The evidence workaround is over: stapel-chat 0.5.0 serves the message.
+
+    It was evidence-based only because nobody served a message's content —
+    a report carried the reporter's own snapshot, stamped unverified. With
+    ``chat.moderation_content`` in the fleet a moderator reads the message
+    itself, and declaring BOTH a content_function and ``evidence`` is
+    moderation.E007, so the flag does not survive the flip.
+    """
     from stapel_moderation.registry import resolve_policy
 
     policy = resolve_policy("chat_message")
-    assert policy["evidence"] is True
-    assert policy["content_function"] == ""
+    assert policy["content_function"] == "chat.moderation_content"
+    # Chat's own id spelling, carrying THIS package's composite key as its
+    # value — see the report tests for the key travelling whole.
+    assert policy["id_field"] == "message_id"
+    assert not policy.get("evidence")
+    # The composite key is not decoration: it is what lets this package —
+    # the only one holding the conversation↔parties join — answer who may
+    # file at all, and that rule survives the content function landing.
+    assert policy["can_report"] == "classified.can_report_message"
     # A message cannot be taken down by anyone but chat, and chat consumes no
     # verdict: the consequence of a case about a message is a Sanction.
     assert policy["verdict_event"] is None
@@ -105,11 +117,28 @@ def test_the_marketplace_reasons_merge_over_the_universal_ones():
     assert "impersonation" in set(reasons_for_target("seller"))
 
 
-def test_both_content_functions_are_reachable():
-    from stapel_core.comm import function_unreachable_reason
+def test_every_declared_content_function_is_reachable():
+    """Not one declared-but-not-connected target left in this composite.
 
-    assert not function_unreachable_reason("listings.moderation_content")
-    assert not function_unreachable_reason("reviews.moderation_content")
+    Three owners answer for the four types: the two members, this package
+    itself for `seller`, and stapel-chat for `chat_message` — the last one
+    only since chat 0.5.0, which is what let the evidence workaround go.
+    """
+    from stapel_core.comm import function_unreachable_reason
+    from stapel_moderation.registry import get_target_types
+
+    declared = {
+        (policy or {}).get("content_function")
+        for policy in get_target_types().values()
+    }
+    assert declared == {
+        "listings.moderation_content",
+        "reviews.moderation_content",
+        "classified.seller_content",
+        "chat.moderation_content",
+    }
+    for name in declared:
+        assert not function_unreachable_reason(name), name
 
 
 def test_intake_topics_are_subscribed():

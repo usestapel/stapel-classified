@@ -2,6 +2,72 @@
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-24
+
+### ⚠️ BREAKING — a reported message is READ now, not quoted
+
+`chat_message` was **evidence-based**: nobody in the fleet served a message's
+content, so a report carried the reporter's own screenshot and a moderator
+read it stamped `source: evidence, verified: false`. **stapel-chat 0.5.0
+shipped `chat.moderation_content`**, and this composite's own MODULE.md had
+already written down what to do about it. Done:
+
+```diff
+ "chat_message": {
+-    "evidence": True,
++    "id_field": "message_id",
++    "content_function": "chat.moderation_content",
+```
+
+No migration — nothing here ever stored a message. What changes is what a
+moderator sees: the message itself, fetched when the case is looked at (so an
+edit made after the complaint is visible), and its real **author** — which an
+attestation could never establish and which is who a `Sanction` is issued
+against. Declaring both a `content_function` and `evidence` is
+moderation.E007, so the flag went with the flip.
+
+**Breaking twice over**, hence a minor under this fleet's pre-1.0 semver:
+
+- `submit_report(target_type="chat_message", evidence=…)` is now **refused**
+  (`400 moderation_evidence_invalid`). A snapshot beside a live content
+  function is a second, staler answer to "what was said".
+- A deployment must have **stapel-chat 0.5+** serving that function, or every
+  complaint about a message answers 503. There is deliberately no silent
+  fallback to an attestation; where no process serves the read,
+  moderation.W006 says so at every boot.
+
+**The composite key does more work, not less.** `<conversation_id>:<message_id>`
+still travels whole, now under chat's own id spelling (`message_id`). This
+package answers WHO may file off the conversation half — the fail-closed
+`classified.can_report_message`, off the join table nobody else holds — and
+chat refuses a message quoted under a conversation it does not belong to, so
+the same key is checked again on the far side of the seam.
+
+### Changed
+
+- `stapel-chat>=0.5,<0.6` — a new pin on a package this composite neither
+  imports nor mounts. See MODULE.md: it fixes which chat a deployment that
+  has one must be on, so a 503 in the moderation queue becomes a resolver
+  error instead.
+- `stapel-moderation>=0.2,<0.4` → `>=0.3,<0.4`. A chat message is the first
+  target here whose content is PRIVATE, and 0.3.0 is where `can_view_content`
+  is asked on behalf of the moderator actually looking (it passed
+  `actor_id=None` before) and where the card's `content` is a declared field
+  of the contract instead of a key grafted onto the response.
+
+### Tests
+
+The harness now mounts **stapel_chat + stapel_realtime** (with a real channel
+layer and origin allowlist, because mounting chat brings its deployment
+checks E010-E014 with it). Doubling `chat.moderation_content` was the obvious
+cheaper move and is exactly what `tests/conftest.py`'s own opening paragraph
+forbids: a mock on either side of a seam cannot prove the seam. So the report
+tests now build a real conversation and a real message through chat's
+services and report THAT — the composite key round-trips through chat's
+splitter, a live edit is what the second read returns, a message quoted under
+the wrong thread is `TargetNotFound`, and a message chat has no copy of is a
+404 rather than a 503. 101 → 103 tests, green.
+
 ## [0.2.1] — 2026-08-24
 
 ### Changed — the moderation pin admits 0.3

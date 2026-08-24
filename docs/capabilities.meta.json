@@ -35,7 +35,7 @@
     {
       "module": "stapel-moderation",
       "optional": false,
-      "reason": "composite member — the cross-target queue; the composite declares its `listing`/`review`/`seller`/`chat_message` target policies and the marketplace reasons (preset.py SETTINGS_DEFAULTS). 0.2.0+ is required for the evidence-based target type a chat message needs"
+      "reason": "composite member — the cross-target queue; the composite declares its `listing`/`review`/`seller`/`chat_message` target policies and the marketplace reasons (preset.py SETTINGS_DEFAULTS). 0.3.0+ is required: a chat message is the first target here whose content is PRIVATE, and 0.3.0 is where `can_view_content` is asked on behalf of the moderator actually looking"
     },
     {
       "module": "stapel-notifications",
@@ -44,8 +44,8 @@
     },
     {
       "module": "stapel-chat",
-      "optional": true,
-      "reason": "not a member and never imported — the conversation ids this composite binds subjects to are chat's. Absent, the join table simply stays empty"
+      "optional": false,
+      "reason": "pinned (>=0.5) but not a member and never imported: the conversation ids this composite binds subjects to are chat's, and the `chat_message` moderation target names `chat.moderation_content`, which arrived in chat 0.5.0. Where no process serves that read, every complaint about a message answers 503 and moderation.W006 says so at boot"
     },
     {
       "module": "stapel-cdn",
