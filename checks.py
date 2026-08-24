@@ -44,20 +44,23 @@ def check_block_enforcement(app_configs, **kwargs):
             f"STAPEL_CLASSIFIED['BLOCK_ENFORCEMENT'] is 'required' and the "
             f"block provider {name!r} cannot be called here: {reason}. Every "
             f"attempt to contact a seller will answer 503.",
-            hint="Install the owning module in this process, configure its "
-                 "function route for the split topology, or drop the "
-                 "posture to 'auto' knowingly.",
+            hint="stapel-profiles >= 0.16.0 serves profiles.relationships: "
+                 "deploy/rebuild the profiles service on that floor FIRST, "
+                 "then this one; configure its function route for a split "
+                 "topology; or set BLOCK_ENFORCEMENT='auto' knowingly (a "
+                 "deployment with no block store). Over a bus transport "
+                 "this check CANNOT see a stale remote provider — confirm "
+                 "the floor is deployed, not merely pinned; a stale one is "
+                 "refused at the first contact attempt with the floor named.",
             id="stapel_classified.E002",
         )]
     return [checks.Warning(
         f"Blocks are NOT enforced in this deployment: {name!r} cannot be "
         f"called here ({reason}), and BLOCK_ENFORCEMENT is 'auto'. Contact "
-        f"between any two users proceeds. stapel-profiles owns the block "
-        f"relationship but publishes no comm Function to read it yet — this "
-        f"is the state the fleet is in, printed rather than assumed.",
-        hint="Set BLOCK_ENFORCEMENT='required' once a provider answers "
-             "STAPEL_CLASSIFIED['BLOCK_FUNCTION'], so a missing one is a "
-             "boot error instead of an open door.",
+        f"between any two users proceeds — printed rather than assumed.",
+        hint="stapel-profiles >= 0.16.0 serves the block read; the default "
+             "posture 'required' makes a missing provider a boot error "
+             "instead of an open door.",
         id="stapel_classified.W001",
     )]
 

@@ -18,11 +18,11 @@ point one at your own provider and the answer changes with no fork.
 
 | Key | Source | Purpose | Required | Default |
 |-----|--------|---------|----------|---------|
-| BLOCK_ENFORCEMENT | env | `auto` (enforce where a block provider answers; announce at boot where none does) / `required` (a missing provider is a boot ERROR, `classified.E002`) / `off` (a disclosed statement, `classified.W002`). In every state a provider that is present and FAILS answers 503 — an outage is not consent. | no | `auto` |
+| BLOCK_ENFORCEMENT | env | `auto` (enforce where a block provider answers; announce at boot where none does) / `required` (a missing provider is a boot ERROR, `classified.E002`) / `off` (a disclosed statement, `classified.W002`). In every state a provider that is present and FAILS answers 503 — an outage is not consent. | no | `required` |
 | BLOCK_FUNCTION | env | comm Function answering "is there a block between these two". `{"pairs": [[a,b],…]} -> {"blocked": [[a,b],…]}`, either direction. stapel-profiles owns the relationship and does not publish this yet. | no | `profiles.relationships` |
 | LISTING_DOCUMENTS_FUNCTION | env | Where every listing card comes from. Serves ALL statuses, which is why a card can say "sold" and "gone" where a public read 404s. | no | `listings.search_documents` |
 | DISPLAY_NAMES_FUNCTION | env | The counterparty's name. | no | `profiles.display_names` |
-| PUBLIC_PROFILE_FUNCTION | env | Avatar ref, member-since, seller type. **Empty**: no such function exists in the fleet yet, and naming one nobody serves would be a declared-and-unconnected dependency. Set it when profiles ships one. | no | `""` |
+| PUBLIC_PROFILE_FUNCTION | env | Avatar (fleet image object), member-since (date), seller type — served by stapel-profiles >= 0.16.0 as `profiles.public_cards`. Set `""` on a deployment without profiles: the counterparty card then answers `meta_status: partial`. | no | `profiles.public_cards` |
 | SELLER_RATING_FUNCTION | env | The rating aggregate for a seller card. | no | `reviews.aggregate` |
 | SELLER_RATING_TARGET_TYPE | env | The reviews target type a seller's rating is keyed under. Empty = this deployment has no seller reviews, and the card says `rating: null` rather than inventing a zero. | no | `""` |
 | MEDIA_DESCRIBE_FUNCTION | env | CDN render metadata for the card's primary image — the same contract stapel-chat uses for an attachment. | no | `cdn.describe_many` |

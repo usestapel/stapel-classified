@@ -221,14 +221,13 @@ gaps to paper over. Each has a working, honest behaviour in the meantime.
    prediction it was written as ("one line of policy, no migration") is worth
    being able to check against what actually happened.
 
-### stapel-profiles (0.15.0 today)
+### stapel-profiles (0.16.0 — both functions served)
 
 1. **`profiles.relationships`** — `{"pairs": [[a, b], …]} -> {"blocked":
    [[a, b], …]}`, either direction. The block exists in the model and in the
-   REST API; no server in the fleet can read it, which makes every block in
-   the fleet client-side today. `BLOCK_ENFORCEMENT` defaults to `auto`
-   because of that, and **flips to `required` in the first release after this
-   function ships** — recorded here rather than left to memory.
+   REST API, and since profiles 0.16.0 a server can read it. `BLOCK_ENFORCEMENT`
+   therefore defaults to `required` (0.3.1): a deployment without a block
+   provider must say so with `auto`, not inherit a silent client-side block.
 2. **`profiles.public_cards`** — `{user_ids} -> {profiles: {id: {display_name,
    avatar, member_since, seller_type}}}`. Until then the counterparty card is
    `partial` with `profile_unavailable`, and the frontend contract says to

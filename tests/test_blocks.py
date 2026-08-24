@@ -25,7 +25,7 @@ def _pair(a, b):
 
 
 def test_with_no_provider_contact_proceeds_and_the_check_says_so(
-    published_listing, other_user
+    settings, published_listing, other_user
 ):
     """No provider registered: this deployment HAS no block store.
 
@@ -36,6 +36,7 @@ def test_with_no_provider_contact_proceeds_and_the_check_says_so(
     """
     from stapel_classified.checks import check_block_enforcement
 
+    settings.STAPEL_CLASSIFIED = {"BLOCK_ENFORCEMENT": "auto"}
     services.bind_listing_conversation(
         conversation_id=uuid.uuid4(),
         listing_key=published_listing.pk,

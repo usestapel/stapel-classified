@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.1 — 2026-08-24
+
+- stapel-profiles 0.16.0 serves `profiles.relationships` and `profiles.public_cards`, so the two settings this
+  module reserved for them stop being placeholders: `BLOCK_ENFORCEMENT` defaults to `required` (the flip MODULE.md
+  promised for the first release after the provider shipped) and `PUBLIC_PROFILE_FUNCTION` defaults to
+  `profiles.public_cards`. A deployment without profiles sets `auto` / `""` explicitly.
+- **Upgrade order:** stapel-profiles to >= 0.16.0 FIRST (rebuild the profiles service), then classified. On a
+  deployment whose profiles service still runs 0.15.x, `manage.py check` refuses to boot with `classified.E002`
+  naming the floor — a refused deploy, not a dead "write to the seller" button in production. Over a bus
+  transport the boot check cannot see a stale remote provider (core's probe says so): there the first contact
+  attempt answers 503 with the floor named, so confirm the profiles floor is DEPLOYED, not merely pinned.
+
 ## [Unreleased]
 
 ## [0.3.0] — 2026-08-24

@@ -1,4 +1,4 @@
-# stapel-classified 0.3.0
+# stapel-classified 0.3.1
 
 Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies and the marketplace reason taxonomy. Since 0.2.0 it also owns the one kind of state a composite may hold: the JOIN between a chat conversation and the listing it is about, because stapel-chat may not know what a listing is and stapel-listings may not know what a conversation is. Off that join it serves a conversation HEADER — the short listing card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone`, which is exactly the answer a public read cannot give) plus the counterparty's public seller card — and it enforces a user-to-user block at the one place a classified conversation begins, announcing at every boot whether that enforcement is live in this deployment.
 
@@ -7,11 +7,11 @@ Generated from docs/capabilities.json by `stapel-llms-txt` — do not edit; drif
 
 ## Configuration axes — what a product switches on
 Settings keys; `default` is what you get by saying nothing. Turning an axis off unmounts the operations it gates.
-- BLOCK_ENFORCEMENT [enum, default "auto"] — Is a block actually enforced
+- BLOCK_ENFORCEMENT [enum, default "required"] — Is a block actually enforced
   Auto: enforced wherever a block provider answers, and where none is registered the deployment is told at every boot that blocks are not enforced here — the state the fleet is in today, printed rather than assumed. 'required' turns a missing provider into a boot error and is the posture for a deployment that runs a profile service; 'off' is a disclosed statement. In every state a provider that is present and FAILS answers 503, never 'allowed': an outage is not consent.
 - BLOCK_FUNCTION [enum, default "profiles.relationships"] — Where a block is looked up
   The comm Function that answers 'is there a block between these two people'. A block belongs to the profile service and this composite keeps no copy of one; it asks, at the single place a classified conversation begins.
-- PUBLIC_PROFILE_FUNCTION [enum, default ""] — How much of a seller the card can show
+- PUBLIC_PROFILE_FUNCTION [enum, default "profiles.public_cards"] — How much of a seller the card can show
   Empty by default because no such function exists in the fleet yet: the counterparty card then carries the display name and the rating and says, in the payload, that the avatar and member-since are missing and why. Naming a function that nobody serves would be a declared-and-unconnected dependency, which is the defect class this fleet gates against.
 - SELLER_RATING_TARGET_TYPE [enum, default ""] — Whether sellers carry a rating
   Empty in the shipped scenario, because this composite registers reviews about listings rather than about people. A deployment that adds a seller review target names it here and the stars appear in every conversation header — with no release. Empty means the card says 'no rating', never a fabricated zero.

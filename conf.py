@@ -38,12 +38,14 @@ DEFAULTS = {
     #                contact proceeds. Never silent: `manage.py check` prints
     #                W001 saying which of the two states you are in.
     #   "required" — an unregistered provider is an ERROR at boot (E002).
-    #                The posture for a deployment that runs stapel-profiles.
+    #                The DEFAULT since stapel-profiles 0.16.0 serves
+    #                profiles.relationships; "auto" is for a deployment that
+    #                knowingly runs without a block provider.
     #   "off"      — a disclosed statement; check prints W002.
     #
     # In every state EXCEPT "off", a provider that IS registered and then
     # fails answers 503, never "allowed": an outage is not consent.
-    "BLOCK_ENFORCEMENT": "auto",
+    "BLOCK_ENFORCEMENT": "required",
     # The comm Function that answers "is there a block between these two?".
     # Shape asked for: {"pairs": [[a, b], ...]} ->
     # {"blocked": [[a, b], ...]} listing the pairs where a block exists in
@@ -60,12 +62,10 @@ DEFAULTS = {
     # Display names for the counterparty card. Names only — everything richer
     # waits for the function below.
     "DISPLAY_NAMES_FUNCTION": "profiles.display_names",
-    # Public profile cards (avatar ref, member-since, seller type). EMPTY by
-    # default because no such comm Function exists in the fleet yet: naming
-    # one here would be a declared-and-unconnected dependency. Set it once
-    # stapel-profiles ships `profiles.public_cards` and the counterparty card
-    # stops answering meta_status "partial" — no release here.
-    "PUBLIC_PROFILE_FUNCTION": "",
+    # Public profile cards (avatar as the fleet image object, member-since as
+    # a date, seller type). stapel-profiles >= 0.16.0 serves it; a deployment
+    # without profiles sets "" and the counterparty card answers "partial".
+    "PUBLIC_PROFILE_FUNCTION": "profiles.public_cards",
     # Rating aggregate for the counterparty card.
     "SELLER_RATING_FUNCTION": "reviews.aggregate",
     # The reviews target type a seller's rating is keyed under. Empty = this

@@ -1,12 +1,12 @@
 {
   "module": "stapel-classified",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "provides": "Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies and the marketplace reason taxonomy. Since 0.2.0 it also owns the one kind of state a composite may hold: the JOIN between a chat conversation and the listing it is about, because stapel-chat may not know what a listing is and stapel-listings may not know what a conversation is. Off that join it serves a conversation HEADER — the short listing card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone`, which is exactly the answer a public read cannot give) plus the counterparty's public seller card — and it enforces a user-to-user block at the one place a classified conversation begins, announcing at every boot whether that enforcement is live in this deployment.",
   "axes": [
     {
       "key": "BLOCK_ENFORCEMENT",
       "kind": "enum",
-      "default": "auto",
+      "default": "required",
       "group": "classified.blocks",
       "gates": {
         "operations": [],
@@ -34,7 +34,7 @@
     {
       "key": "PUBLIC_PROFILE_FUNCTION",
       "kind": "enum",
-      "default": "",
+      "default": "profiles.public_cards",
       "group": "classified.cards",
       "gates": {
         "operations": [],

@@ -104,7 +104,14 @@ def blocked_pairs(pairs) -> set:
         )
     except Exception as exc:  # noqa: BLE001 — an outage is not consent
         logger.warning("classified: block check via %r failed: %s", name, exc)
-        raise BlockCheckUnavailable(str(exc)) from exc
+        # Over a bus the boot check cannot see a stale remote peer, so THIS
+        # is where an old profiles service is discovered. Name the cause,
+        # not the symptom: the operator reading a 503 needs the floor.
+        raise BlockCheckUnavailable(
+            f"{exc} — if the profiles service answered 'no such function', "
+            f"it is older than stapel-profiles 0.16.0, which is the first "
+            f"release serving {name!r}; deploy it before this service"
+        ) from exc
 
     blocked = (answer or {}).get("blocked") or []
     return {frozenset((str(a), str(b))) for a, b in blocked if a and b}

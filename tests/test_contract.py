@@ -212,8 +212,8 @@ def test_the_block_posture_is_published_as_it_ships():
     posture. One that claimed enforcement while the code shipped 'auto' would
     be worse than no document at all."""
     axes = {a["key"]: a for a in _capabilities()["axes"]}
-    assert axes["BLOCK_ENFORCEMENT"]["default"] == "auto"
-    assert axes["PUBLIC_PROFILE_FUNCTION"]["default"] == ""
+    assert axes["BLOCK_ENFORCEMENT"]["default"] == "required"
+    assert axes["PUBLIC_PROFILE_FUNCTION"]["default"] == "profiles.public_cards"
 
 
 def test_version_tracks_pyproject():
