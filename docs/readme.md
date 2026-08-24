@@ -33,10 +33,10 @@ urlpatterns = [
 ]
 ```
 
-Mount from `preset.URL_INCLUDES` rather than by hand: `stapel-categories` and
-`stapel-listings` contribute only the `v1/` segment and belong under
-`<mod>/api/`, while `reviews`, `geo`, `search` and `moderation` bake `api/v1/`
-in themselves. Both end at `/<mod>/api/v1/...`, and getting it wrong is a
+Mount from `preset.URL_INCLUDES` rather than by hand: `stapel-classified`
+(its own conversation surface), `stapel-categories` and `stapel-listings`
+contribute only the `v1/` segment and belong under `<mod>/api/`, while
+`reviews`, `geo`, `search` and `moderation` bake `api/v1/` in themselves. Both end at `/<mod>/api/v1/...`, and getting it wrong is a
 `stapel_core.mounts.E004` refusal to boot, not a cosmetic difference.
 
 ## Config checklist (fill these, in the generated project's CONFIG.MD too)
@@ -45,7 +45,8 @@ in themselves. Both end at `/<mod>/api/v1/...`, and getting it wrong is a
 |-----|------|
 | `STAPEL_REVIEWS["TARGET_TYPES"]` | prefilled by the preset (targets `listing`) |
 | `STAPEL_SEARCH["SOURCES"]` | prefilled by the preset (the `listing` source) |
-| `STAPEL_MODERATION["TARGET_TYPES"]` | prefilled by the preset (`listing` pre-publication, `review` post) |
+| `STAPEL_MODERATION["TARGET_TYPES"]` | prefilled by the preset (`listing` pre-publication, `review`/`seller`/`chat_message` post) |
+| `STAPEL_CLASSIFIED["BLOCK_ENFORCEMENT"]` | `auto` — enforced where a block provider answers, and `manage.py check` says at every boot which state you are in. Set `required` once one does. |
 | `STAPEL_ACCESS["ROLES"]` | **yours** — the moderation console is staff-only; `preset.RECOMMENDED_ACCESS_ROLES` shows the shape |
 | `STAPEL_GDPR["DATA_OWNERS"]` | **yours** — must list `"moderation"`, or erasure never closes over complaint data |
 | `STAPEL_MODERATION["APPEAL_URL_TEMPLATE"]` | **yours** — an empty appeal link is what DSA Art. 17 notices |
@@ -72,3 +73,26 @@ a listing is. This package is the one place that knows both sides:
 
 Coordinates need no glue at all: they are the listing's OWN fields (lat/lon on
 the listing), not a foreign aggregate.
+
+## The conversation header (0.2.0)
+
+A chat in a classified marketplace is always ABOUT something and BETWEEN two
+identified people. Neither fact belongs to the messaging engine, so this
+composite owns the join and serves the header:
+
+```
+POST /classified/api/v1/conversations           bind a chat thread to a listing
+GET  /classified/api/v1/conversations/{id}      one header
+POST /classified/api/v1/conversations/contexts  a page of them, for the inbox
+```
+
+A header carries the **short listing card** — title, price, primary image
+with CDN render metadata, and a `state` of `available` / `unavailable`
+(sold, paused, expired) / `gone`, which is the answer a public listing read
+cannot give and exactly the case a buyer is most confused by — plus the
+**counterparty's public seller card**. Never more of a person than their
+public profile.
+
+`docs/frontend-contract.md` is the document the default skins build against:
+every payload, every refusal, and the six things the fleet does not serve yet
+with what the UI does about each in the meantime.

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "classified.can_report_message",
+  "description": "The `can_report` policy callback for stapel-moderation's `chat_message` target type: may this reporter complain about that message? The target_key is `<conversation_id>:<message_id>`, and the conversation half is what makes the question answerable — this composite holds the only table in the fleet that says who the two parties of a classified conversation are. Answers {\"allowed\": bool, \"reason\"?: string}. Fail-CLOSED: a malformed key, an unbound conversation or an outsider all answer false.",
+  "type": "object",
+  "required": ["reporter_id", "target_type", "target_key"],
+  "properties": {
+    "reporter_id": { "type": "string" },
+    "target_type": { "type": "string" },
+    "target_key": {
+      "type": "string",
+      "description": "`<conversation_id>:<message_id>`."
+    }
+  },
+  "additionalProperties": false
+}

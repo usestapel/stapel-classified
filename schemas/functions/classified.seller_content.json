@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "classified.seller_content",
+  "description": "One seller's PUBLIC identity in the *.moderation_content shape, so stapel-moderation can carry a `seller` target type in a marketplace where stapel-profiles serves no moderation content of its own. Answers {seller_id, title (the display name), text, language, media, author_id, url, rating, seller_type}. `author_id` is the seller's own id, which is what makes 'you cannot report your own content' answerable without trusting anything a client sent. Never more than the public profile.",
+  "type": "object",
+  "required": ["seller_id"],
+  "properties": {
+    "seller_id": {
+      "type": "string",
+      "description": "The seller's user id — the moderation target_key."
+    }
+  },
+  "additionalProperties": false
+}

@@ -2,6 +2,121 @@
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-24
+
+The owner opened the live product's chat and could not tell **who** he was
+talking to or **what** the conversation was about — no short listing card, no
+seller data. Neither half belongs to the chat engine (stapel-chat may not
+know what a listing is) or to the catalogue (stapel-listings may not know
+what a conversation is). This release is the join, and everything that hangs
+off it.
+
+### Changed — what a composite may own (the founding law, restated)
+
+Until now this package wrote no code but `search_sources.py` and served no
+HTTP. The law was never "no code": `search_sources` exists because *this
+package is the one place that knows both sides*. Restated, and now applying
+to state as well as to declarations:
+
+> A composite writes no member-domain logic. It MAY own cross-domain JOIN
+> state — models and comm Functions whose schema is nothing but two members'
+> opaque keys and the minimal glue between them — because no member is
+> allowed to hold that join.
+
+Consequences: `http=True` in the STAPEL_LIBS registry (a change routed to
+stapel-tools), one mounted surface (`classified/api/`), one migration, and
+this module now emits its own contract triad + capabilities like every other.
+
+### Added
+
+**`ConversationSubject`** (migration `0001_initial`) — `(conversation_id,
+subject_type, subject_key, initiator_id, counterparty_id, scope_key)`. No FK
+to anything: in the 7-service topology those keys live in three different
+databases. **Append-only, several subjects per conversation allowed**, which
+is chat 0.4.0's own arithmetic rather than a preference: a direct thread is
+keyed by the participant PAIR and uniquely constrained, so one buyer and one
+seller have exactly one thread however many listings they discuss. Refusing
+the second listing would render the wrong card — the very defect this closes.
+**Marked for deletion**: when stapel-chat ships native subjects this table is
+migrated into it and dropped, not kept as a shadow.
+
+**Three endpoints** under `/classified/api/v1/`, all authenticated:
+
+- `POST conversations` — bind a chat conversation to the listing it is about
+  and answer the header. Idempotent per `(conversation, listing)`; the first
+  writer's parties stand.
+- `GET conversations/{id}` — one header. A conversation you are not a party
+  of answers the same 404 as one that does not exist: a 403 would confirm the
+  id names a real thread.
+- `POST conversations/contexts` — a bounded page of headers for the inbox, in
+  two comm reads rather than one round trip per row.
+
+**The short listing card**, with the field this whole wave exists for:
+`state` = `available` / `unavailable` (sold, paused, expired, blocked —
+`status` says which) / `gone` (deleted). The public listing read 404s
+everything that is not published, which is correct for a stranger and useless
+for the person standing in the conversation about it — and that is exactly
+when a buyer is most confused. The card also carries the primary image's CDN
+render metadata (`aspect`, `preview_b64`, `preview_kind`, `variants`), the
+same contract stapel-chat uses for an attachment, so one picture has one
+answer.
+
+**The public seller card** — display name, avatar ref, member-since, seller
+type, rating. Never more of a person than their public profile. Today the
+fleet publishes no public-profile comm read, so the card answers
+`meta_status: "partial"`, `meta_reason: "profile_unavailable"` and names what
+is missing instead of leaving a blank.
+
+**Two more moderation target types**, both declared here because only this
+package knows the vertical:
+
+- `seller` — content served by this composite itself
+  (`classified.seller_content`: the display name and rating a marketplace
+  shows in public, with the seller's own id as `author_id`, which is what
+  makes "you cannot report yourself" answerable without trusting a client);
+- `chat_message` — **evidence-based** (stapel-moderation 0.2.0): nobody in
+  the fleet serves a chat message's content, so the report carries the
+  reporter's snapshot. Its key is `<conversation_id>:<message_id>` and its
+  `can_report` is `classified.can_report_message`, which fails CLOSED — only
+  the two people in the thread may complain about what was said in it, and
+  this package holds the only table in the fleet that can answer who they are.
+
+**Marketplace reason codes** merged over moderation's universal taxonomy:
+`prohibited_item`, `misleading_price`, `already_sold`, `impersonation`. An
+open registry, so a deployment adds or removes one in its own settings.
+
+**Server-side block enforcement** at the one place a classified conversation
+begins. The block itself stays stapel-profiles' (`UserRelationship`) — this
+composite keeps no copy and asks. `BLOCK_ENFORCEMENT` is `auto` /
+`required` / `off`, and the state a deployment is actually in is printed at
+every `manage.py check` (`classified.W001` / `E002` / `W002`) rather than
+assumed. A provider that is present and FAILS answers 503, never "allowed":
+an outage is not consent.
+
+**`STAPEL_CLASSIFIED`** settings namespace (`conf.py`, CONFIG.MD), **five
+error keys** with ru/es catalogues, **three comm Functions**
+(`classified.subject_cards` — the shape a subject-aware stapel-chat will name
+as its `card_function` — `classified.seller_content`,
+`classified.can_report_message`), and this module's own contract emission
+(`_codegen.py`, `_capabilities.py`, `codegen_urls.py`, `make contract`).
+
+### Dependencies
+
+- `stapel-moderation>=0.2,<0.3` — the evidence-based target type.
+- `stapel-core>=0.43` — the hoisted `SerializerSeamMixin` / `StapelAPIView`.
+
+### Known limitation (stated, not hidden)
+
+**The binding is a claim by the person who makes it.** chat 0.4.0 exposes no
+comm Function that could answer "is this user a participant", so a bind
+records the caller as one party and the listing's owner as the other, and the
+context read is authorized against that row. Forging one needs the
+conversation's UUID (which only its participants hold) and buys the forger
+nothing but a public listing card and a public seller card. It is closed the
+moment chat ships either a participants read or native subjects — the shape
+routed to its owner and written down in MODULE.md.
+
+
 ## [0.1.8] — 2026-08-24
 
 ### Changed — pins admit `stapel-listings` 0.7 (the geohash-stamp fix)

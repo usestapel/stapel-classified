@@ -1,0 +1,443 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "",
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/classified/api/v1/conversations": {
+      "post": {
+        "operationId": "classified_api_v1_conversations_create",
+        "description": "Record that a chat conversation is about a listing, and answer with the\nheader the client is about to render.\n\nIdempotent: the same (conversation, listing) pair is one fact however many\ntimes a retry or a second tab reports it, and the first writer's parties\nstand — a later caller cannot rewrite who the two sides of a thread are.\n\n**Permissions:** `IsNotAnonymousUser`",
+        "tags": [
+          "Classified / conversations"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationBind"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationBind"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationBind"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationContextDTO"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/classified/api/v1/conversations/{conversation_id}": {
+      "get": {
+        "operationId": "classified_api_v1_conversations_retrieve",
+        "description": "The header of one conversation.\n\nA conversation the caller is not a party of answers 404, exactly like one\nthat does not exist. A 403 would confirm the id names a real thread, and\nthe id is the only thing keeping a stranger's conversation unprobed.\n\n**Permissions:** `IsNotAnonymousUser`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Classified / conversations"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationContextDTO"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/classified/api/v1/conversations/contexts": {
+      "post": {
+        "operationId": "classified_api_v1_conversations_contexts_create",
+        "description": "Headers for a page of the inbox, in one call.\n\nA conversation list that resolves its cards one request per row is a list\nthat does not open. The page is bounded by ``CONTEXT_BATCH_LIMIT`` and\ncosts two comm reads plus one rating read per distinct counterparty,\nwhatever the page size.\n\nPOST rather than GET because the body is a list of ids: a query string of\nfifty UUIDs is a proxy limit waiting to be discovered in production.\n\n**Permissions:** `IsNotAnonymousUser`",
+        "tags": [
+          "Classified / conversations"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationContextQuery"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationContextQuery"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationContextQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationContextPageDTO"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CardImageDTO": {
+        "type": "object",
+        "description": "The card's primary image: an opaque CDN ref plus what a UI needs to\nreserve its box before the bytes arrive. Same fields, same meanings and\nsame source (``cdn.describe_many``) as a stapel-chat attachment.",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "mime": {
+            "type": "string",
+            "nullable": true
+          },
+          "ext": {
+            "type": "string",
+            "nullable": true
+          },
+          "bytes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "width": {
+            "type": "integer",
+            "nullable": true
+          },
+          "height": {
+            "type": "integer",
+            "nullable": true
+          },
+          "aspect": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "square": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "animated": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "preview_b64": {
+            "type": "string",
+            "nullable": true
+          },
+          "preview_kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "meta_status": {
+            "type": "string"
+          },
+          "meta_reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ConversationBind": {
+        "type": "object",
+        "description": "Bind a chat conversation to the listing it is about.\n\n``conversation_id`` comes from stapel-chat, which the client has just\ncalled (``POST /chat/api/v1/conversations``). It is not created here and\ncould not be: chat 0.4.0 publishes no comm Function to create one and no\nevent when one appears — both are routed upstream, and until they land\nthe client is the only party holding both halves.",
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "listing_id": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "scope_key": {
+            "type": "string",
+            "default": "",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "conversation_id",
+          "listing_id"
+        ]
+      },
+      "ConversationContextDTO": {
+        "type": "object",
+        "description": "One conversation's header: the subject, the counterparty, my role.",
+        "properties": {
+          "conversation_id": {
+            "type": "string"
+          },
+          "scope_key": {
+            "type": "string"
+          },
+          "subject": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubjectDTO"
+              }
+            ],
+            "nullable": true
+          },
+          "counterparty": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SellerCardDTO"
+              }
+            ],
+            "nullable": true
+          },
+          "viewer_role": {
+            "type": "string"
+          },
+          "previous_subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectDTO"
+            }
+          }
+        }
+      },
+      "ConversationContextPageDTO": {
+        "type": "object",
+        "description": "A batch answer, keyed by conversation id.\n\nIds the caller is not a party of are simply ABSENT — a 403 per row would\nconfirm that an id names a real thread, and the id is the only thing\nprotecting a stranger's conversation from being probed.",
+        "properties": {
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ConversationContextDTO"
+            }
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ConversationContextQuery": {
+        "type": "object",
+        "description": "A page of conversation ids to resolve headers for — the inbox call.",
+        "properties": {
+          "conversation_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "conversation_ids"
+        ]
+      },
+      "ListingCardDTO": {
+        "type": "object",
+        "description": "The short listing card a conversation header shows.\n\n``state`` is the field this whole wave exists for: ``available``,\n``unavailable`` (paused, expired, sold, blocked — it exists and is not\nlive) and ``gone`` (deleted). A buyer is most confused exactly when the\nthing is no longer on sale, and that is the case a public 404 cannot\nexpress.",
+        "properties": {
+          "listing_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "price": {
+            "type": "string",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string"
+          },
+          "location_label": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "image": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CardImageDTO"
+              }
+            ],
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "moderation_status": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "meta_status": {
+            "type": "string"
+          },
+          "meta_reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "RatingDTO": {
+        "type": "object",
+        "description": "An aggregate, or nothing at all. Never a fabricated zero.",
+        "properties": {
+          "avg": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer"
+          }
+        }
+      },
+      "SellerCardDTO": {
+        "type": "object",
+        "description": "The counterparty, as the marketplace shows them in public.\n\nNever more than the public profile: display name, avatar ref,\nmember-since, seller type, rating. A conversation is not a lookup tool.",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string",
+            "nullable": true
+          },
+          "member_since": {
+            "type": "string",
+            "nullable": true
+          },
+          "seller_type": {
+            "type": "string"
+          },
+          "rating": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RatingDTO"
+              }
+            ],
+            "nullable": true
+          },
+          "url": {
+            "type": "string"
+          },
+          "meta_status": {
+            "type": "string"
+          },
+          "meta_reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SubjectDTO": {
+        "type": "object",
+        "description": "What a conversation is about, and since when.",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "listing": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ListingCardDTO"
+              }
+            ],
+            "nullable": true
+          },
+          "bound_at": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "JWTCookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "stapel_jwt",
+        "description": "JWT token stored in cookie. Login via /auth/admin/ to get the cookie."
+      }
+    }
+  }
+}

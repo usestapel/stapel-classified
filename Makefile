@@ -1,38 +1,53 @@
+# stapel-classified — contract emission + drift gate (contract-pipeline.md §2-3).
+#
+# Until 0.2.0 this module served no HTTP and owned no state, so it had no
+# schema/flows/errors triad and docs/capabilities.json was hand-authored. It
+# now serves /classified/api/v1 (the conversation<->listing join no member is
+# allowed to hold), so it emits the same five artifacts every other module
+# does, from a single-module {classified + core} instance mounted at the
+# canonical prefix (_codegen.py / _codegen_settings.py / codegen_urls.py).
+#
+# A composite's schema is its OWN surface, never the union of its members' —
+# each member emits its own.
+#
+# PYTHON must have the module + its deps importable (the repo venv, or a CI
+# venv). Emission is pinned to Python 3.12: drf-spectacular renders component
+# descriptions differently across minors, and a contract emitted on the wrong
+# one produces false diffs forever.
 PYTHON ?= python3
 
-.PHONY: contract contract-check
+.PHONY: contract contract-check lint test migration-lint
 
-# First: patch the `surface` section of docs/capabilities.json
-# (discoverability-design.md §1.2, stapel_tools.surface --patch) — the symbols
-# a product is meant to CALL instead of writing its own, plus a refresh of
-# module/version from pyproject. NOTE: the rest of docs/capabilities.json in
-# this module is HAND-AUTHORED (no schema/flows/errors triad emitter exists —
-# see git log: "author capabilities.json for the stapel-catalog sweep") and
-# this target never touches provides/axes/extension_points/requires — only
-# module/version/surface. stapel-classified's surface_roots
-# (docs/capabilities.meta.json) is deliberately EMPTY: the composite is
-# transparent INSTALLED_APPS/urls/config glue over stapel-categories +
-# stapel-listings + stapel-reviews + stapel-geo and has no permission classes,
-# functions, capability fields or templates of its own.
-#
-# Second: emit the fifth contract artifact, docs/llms.txt
-# (stapel_tools.llms_txt — the module's own context slice for an agent;
-# badge-canon §3), from the (now-patched) docs/capabilities.json.
-#
-# Third: assemble README.md (stapel_tools.readme) from docs/readme.md — the
-# human half, the only file a person edits — plus the artifacts above. The
-# badge row, the version, the fact table and every doc link are generated,
-# so they cannot lag a release the way a hand-written README always has.
 contract:
-	$(PYTHON) -m stapel_tools.surface . --patch
+	$(PYTHON) -m stapel_classified._codegen --out docs
+	$(PYTHON) -m stapel_classified._capabilities --out docs
 	$(PYTHON) -m stapel_tools.llms_txt . --out docs
 	$(PYTHON) -m stapel_tools.readme .
 
-# Drift gate: surface --patch --check compares the derived module/version/
-# surface against the committed capabilities.json; llms_txt's own --check
-# mode compares a fresh render against the committed docs/llms.txt; readme
-# --check compares a fresh render against the committed README.md.
+# Drift gate: regenerate into a temp dir and diff against the committed docs/*.
 contract-check:
-	$(PYTHON) -m stapel_tools.surface . --patch --check
-	$(PYTHON) -m stapel_tools.llms_txt . --check
-	$(PYTHON) -m stapel_tools.readme . --check
+	@tmp=$$(mktemp -d); \
+	$(PYTHON) -m stapel_classified._codegen --out "$$tmp" || { rm -rf "$$tmp"; exit 1; }; \
+	$(PYTHON) -m stapel_classified._capabilities --out "$$tmp" || { rm -rf "$$tmp"; exit 1; }; \
+	$(PYTHON) -m stapel_tools.llms_txt . --out "$$tmp" || { rm -rf "$$tmp"; exit 1; }; \
+	rc=0; \
+	for f in schema.json flows.json errors.json capabilities.json llms.txt; do \
+		if ! diff -q "docs/$$f" "$$tmp/$$f" >/dev/null 2>&1; then \
+			echo "DRIFT: docs/$$f is stale — run 'make contract' and commit it"; \
+			diff "docs/$$f" "$$tmp/$$f" | head -20; rc=1; \
+		fi; \
+	done; \
+	rm -rf "$$tmp"; \
+	$(PYTHON) -m stapel_tools.readme . --check || rc=1; \
+	if [ $$rc -eq 0 ]; then echo "contract-check: docs/{schema,flows,errors,capabilities,llms.txt} + README.md up to date"; fi; \
+	exit $$rc
+
+# Expand/contract gate for Django migrations (release-management.md §3).
+migration-lint:
+	$(PYTHON) -m stapel_tools.migration_lint . --strict $(if $(BASE_SHA),--base-sha $(BASE_SHA),)
+
+lint:
+	ruff check . --select E,F,W --ignore E501
+
+test:
+	$(PYTHON) -m pytest tests/ -q

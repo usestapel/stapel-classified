@@ -95,3 +95,108 @@ def published_listing(make_listing):
     listing.apply_moderation("approved")
     listing.refresh_from_db()
     return listing
+
+
+# ── API + comm harness for the conversation surface ──────────────────
+
+
+@pytest.fixture(autouse=True)
+def _reset_comm_functions():
+    """Restore the Function registry around every test.
+
+    Snapshot-and-restore rather than clear: this package REGISTERS its own
+    providers at ``ready()`` (``classified.subject_cards``,
+    ``classified.seller_content``), and clearing outright would unregister
+    them for every later test.
+    """
+    from stapel_core.comm.registry import function_registry
+
+    providers = dict(function_registry._providers)
+    schemas = dict(function_registry._schemas)
+    yield
+    function_registry._providers.clear()
+    function_registry._providers.update(providers)
+    function_registry._schemas.clear()
+    function_registry._schemas.update(schemas)
+
+
+@pytest.fixture
+def client_for():
+    """``client_for(user)`` — a fresh authenticated client per actor.
+
+    Per actor rather than one shared client: a conversation has two sides and
+    re-authenticating one handle silently changes who every earlier one is.
+    """
+    from rest_framework.test import APIClient
+
+    def _make(user=None):
+        client = APIClient()
+        if user is not None:
+            client.force_authenticate(user=user)
+        return client
+
+    return _make
+
+
+@pytest.fixture
+def cdn_double():
+    """A ``cdn.describe_many`` double whose answer a test controls."""
+    from stapel_core.comm import function
+
+    state = {"items": {}, "missing": [], "calls": []}
+
+    @function("cdn.describe_many")
+    def _describe(payload):
+        state["calls"].append(payload)
+        refs = payload.get("refs") or []
+        return {
+            "items": {r: state["items"][r] for r in refs if r in state["items"]},
+            "missing": [r for r in refs if r in state["missing"]],
+        }
+
+    return state
+
+
+@pytest.fixture
+def profiles_double():
+    """``profiles.display_names`` — the only public-profile read the fleet has."""
+    from stapel_core.comm import function
+
+    state = {"display_names": {}}
+
+    @function("profiles.display_names")
+    def _names(payload):
+        wanted = [str(u) for u in (payload.get("user_ids") or [])]
+        return {
+            "display_names": {
+                u: state["display_names"][u] for u in wanted if u in state["display_names"]
+            }
+        }
+
+    return state
+
+
+@pytest.fixture
+def blocks_double(settings):
+    """The routed-upstream ``profiles.relationships`` provider, in-process.
+
+    Registering it is how a test puts the composite into the state the fleet
+    will be in once stapel-profiles ships the function: blocks enforced, not
+    merely declared.
+    """
+    from stapel_core.comm import function
+
+    state = {"blocked": set(), "fail": False}
+
+    @function("profiles.relationships")
+    def _relationships(payload):
+        if state["fail"]:
+            raise RuntimeError("profiles is down")
+        pairs = payload.get("pairs") or []
+        return {
+            "blocked": [
+                [a, b] for a, b in pairs if frozenset((str(a), str(b))) in state["blocked"]
+            ]
+        }
+
+    return state

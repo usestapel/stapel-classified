@@ -1,16 +1,127 @@
-# stapel-classified 0.1.8
+# stapel-classified 0.2.0
 
-Composite preset for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation. Carries the cross-domain declarations no member is allowed to write: the `listing` search source (listings.search_documents/search_export -> SearchDocumentInput, invalidated by listing.*) and the `listing`/`review` moderation target policies, plus the shop composite's ListingReviewSummaryProjection. Listing coordinates are the listing's own fields, not a projection. Mounts no urls of its own.
+Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies and the marketplace reason taxonomy. Since 0.2.0 it also owns the one kind of state a composite may hold: the JOIN between a chat conversation and the listing it is about, because stapel-chat may not know what a listing is and stapel-listings may not know what a conversation is. Off that join it serves a conversation HEADER — the short listing card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone`, which is exactly the answer a public read cannot give) plus the counterparty's public seller card — and it enforces a user-to-user block at the one place a classified conversation begins, announcing at every boot whether that enforcement is live in this deployment.
 
-Contract: (no catalogued surface).
+Contract: axes 4 · surface 9 · extension points 3 · operations 3 · error codes 47.
 Generated from docs/capabilities.json by `stapel-llms-txt` — do not edit; drift-gated by `make contract-check`.
+
+## Configuration axes — what a product switches on
+Settings keys; `default` is what you get by saying nothing. Turning an axis off unmounts the operations it gates.
+- BLOCK_ENFORCEMENT [enum, default "auto"] — Is a block actually enforced
+  Auto: enforced wherever a block provider answers, and where none is registered the deployment is told at every boot that blocks are not enforced here — the state the fleet is in today, printed rather than assumed. 'required' turns a missing provider into a boot error and is the posture for a deployment that runs a profile service; 'off' is a disclosed statement. In every state a provider that is present and FAILS answers 503, never 'allowed': an outage is not consent.
+- BLOCK_FUNCTION [enum, default "profiles.relationships"] — Where a block is looked up
+  The comm Function that answers 'is there a block between these two people'. A block belongs to the profile service and this composite keeps no copy of one; it asks, at the single place a classified conversation begins.
+- PUBLIC_PROFILE_FUNCTION [enum, default ""] — How much of a seller the card can show
+  Empty by default because no such function exists in the fleet yet: the counterparty card then carries the display name and the rating and says, in the payload, that the avatar and member-since are missing and why. Naming a function that nobody serves would be a declared-and-unconnected dependency, which is the defect class this fleet gates against.
+- SELLER_RATING_TARGET_TYPE [enum, default ""] — Whether sellers carry a rating
+  Empty in the shipped scenario, because this composite registers reviews about listings rather than about people. A deployment that adds a seller review target names it here and the stars appear in every conversation header — with no release. Empty means the card says 'no rating', never a fabricated zero.
+
+## Usage surface — call these before writing your own
+This is the answer to "does Stapel already have something for X?". `instead of` names the outside symbol this one displaces.
+### gate_function
+- blocked_pairs — stapel_classified.blocks.blocked_pairs
+  instead of: calling is_blocked in a loop
+  The batch form: which of these pairs are blocked, in one call.
+- is_blocked — stapel_classified.blocks.is_blocked
+  instead of: hiding the button in the UI, querying a relationship table
+  Whether a block stands between two users, in either direction, under this deployment's declared enforcement posture. Raises rather than answering False when a configured provider fails.
+- provider_unreachable_reason — stapel_classified.blocks.provider_unreachable_reason
+  instead of: assuming a comm function is reachable
+  Why the configured block provider cannot be called here, or an empty string — what the boot check prints and what tells the difference between 'no blocks in this deployment' and 'the block store is down'.
+### factory
+- bind_listing_conversation — stapel_classified.services.bind_listing_conversation
+  instead of: storing a listing_id on your own chat model
+  Record that a chat conversation is about a listing — the 'write to the seller' moment. Resolves the seller, refuses self-contact, enforces the block, and is idempotent per (conversation, listing).
+- conversation_context — stapel_classified.services.conversation_context
+  instead of: fetching the listing and the profile separately in a client
+  One conversation's header: the short listing card (including sold and deleted, which is when a buyer is most confused) and the counterparty's public seller card, from the reader's side.
+- conversation_contexts — stapel_classified.services.conversation_contexts
+  instead of: looping conversation_context over a conversation list
+  The batch form the inbox calls: a bounded page of headers in two comm reads, instead of one round trip per row.
+- current_subject — stapel_classified.services.current_subject
+  instead of: ConversationSubject.objects.filter(...).first()
+  The newest subject recorded for a conversation — the header's listing, when a thread has carried more than one.
+- listing_cards — stapel_classified.cards.listing_cards
+  instead of: calling listings.search_documents and formatting a card yourself
+  Keyed batch of short listing cards, gone ones included, with the CDN render metadata already merged over the primary image.
+- seller_cards — stapel_classified.cards.seller_cards
+  instead of: reading a Profile row or a User row for a chat header
+  Keyed batch of PUBLIC seller cards — never more of a person than their public profile, whatever the caller holds.
+
+## Extension points — what a product replaces, fork-free
+- STAPEL_CLASSIFIED comm Function names [settings]
+  Every read the conversation header makes is a comm Function NAME in this module's settings namespace — the listing documents, the display names, the public profile card, the seller rating, the CDN describe. Point one at your own provider and the answer changes with no fork and no release.
+- STAPEL_MODERATION / STAPEL_SEARCH / STAPEL_REVIEWS declarations [settings]
+  preset.SETTINGS_DEFAULTS is plain data: the search source, the four moderation target policies and the marketplace reason codes. All three registries merge over their built-ins, so a deployment adds a reason or removes a target type in its own settings rather than upstream.
+- SerializerSeamMixin on every view [subclass]
+  core's hoisted serializer seam: subclass a view, set request_serializer_class / response_serializer_class, remount the URL. No HTTP method body is ever copied.
 
 ## Fits with — fleet dependencies
 - stapel-attributes (required) — L1 library dependency of stapel-categories/stapel-listings; pip dependency, not a Django app (preset.py comment)
 - stapel-categories (required) — composite member, inherited from the shop scenario (preset.py INSTALLED_APPS/URL_INCLUDES)
+- stapel-cdn (optional) — reached by name (`cdn.describe_many`) for the card image's render metadata — the same contract stapel-chat uses for an attachment. Absent, the card keeps the image ref and says `meta_status: partial`
+- stapel-chat (optional) — not a member and never imported — the conversation ids this composite binds subjects to are chat's. Absent, the join table simply stays empty
 - stapel-geo (required) — composite member — location binding for classified ads (preset.py INSTALLED_APPS/URL_INCLUDES)
 - stapel-listings (required) — composite member — the classified ad itself (preset.py INSTALLED_APPS/URL_INCLUDES)
-- stapel-moderation (required) — composite member — the cross-target queue; the composite declares its `listing`/`review` target policies (preset.py SETTINGS_DEFAULTS)
+- stapel-moderation (required) — composite member — the cross-target queue; the composite declares its `listing`/`review`/`seller`/`chat_message` target policies and the marketplace reasons (preset.py SETTINGS_DEFAULTS). 0.2.0+ is required for the evidence-based target type a chat message needs
 - stapel-notifications (optional) — not a member; when co-installed it routes the moderation letters (`listing_blocked`, `moderation.*`) the target policies name — absent, no letter is sent and nothing pretends one was
+- stapel-profiles (optional) — reached by name for the counterparty card (`profiles.display_names`) and for block enforcement (`profiles.relationships`, which profiles does not publish yet). Absent, the seller card is `partial` and `manage.py check` prints classified.W001 saying blocks are not enforced here
 - stapel-reviews (required) — composite member, inherited from the shop scenario (preset.py INSTALLED_APPS/URL_INCLUDES)
 - stapel-search (required) — composite member — the index, facets and geo radius over listings; the composite declares its `listing` source (preset.py SETTINGS_DEFAULTS, search_sources.py)
+
+## HTTP operations (3) — call by operationId, never by a typed path
+Paths are relative to `/classified/api/v1/`.
+### Classified / conversations
+- POST /conversations/contexts — classified_api_v1_conversations_contexts_create
+- POST /conversations — classified_api_v1_conversations_create
+- GET /conversations/{conversation_id} — classified_api_v1_conversations_retrieve
+
+## Error codes (47) — the StapelError envelope
+Render `t(code, params)`; branch UX on the remediation. Localized text lives in docs/errors.<lang>.md, not here.
+- error.400.bad_request [400] fix_input
+- error.400.captcha_invalid [400] retry
+- error.400.captcha_required [400] retry
+- error.400.classified_own_listing [400] fix_input
+- error.400.expected_list [400] fix_input
+- error.400.field.blank [400] fix_input {field}
+- error.400.field.does_not_exist [400] fix_input {field}
+- error.400.field.invalid [400] fix_input {field}
+- error.400.field.invalid_choice [400] fix_input {field}
+- error.400.field.max_length [400] fix_input {field,max_length}
+- error.400.field.max_value [400] fix_input {field,max_value}
+- error.400.field.min_length [400] fix_input {field,min_length}
+- error.400.field.min_value [400] fix_input {field,min_value}
+- error.400.field.null [400] fix_input {field}
+- error.400.field.required [400] fix_input {field}
+- error.400.field.unique [400] fix_input {field}
+- error.400.invalid_ad_id [400] fix_input
+- error.400.validation_error [400] fix_input
+- error.400.verification_failed [400] verify
+- error.400.verification_invalid_factor [400] verify
+- error.401.unauthorized [401] reauthenticate
+- error.402.payment_required [402] retry
+- error.403.classified_contact_refused [403] contact_support
+- error.403.forbidden [403] retry
+- error.403.network_blocked [403] contact_support
+- error.403.verification_enrollment_required [403] verify
+- error.403.verification_required [403] verify
+- error.404.ad_not_found [404] retry
+- error.404.classified_conversation_not_found [404] verify
+- error.404.classified_listing_not_found [404] verify
+- error.404.not_found [404] retry
+- error.404.verification_challenge_not_found [404] verify
+- error.405.method_not_allowed [405] retry
+- error.406.not_acceptable [406] retry
+- error.408.request_timeout [408] retry
+- error.409.conflict [409] fix_input
+- error.410.gone [410] retry
+- error.413.payload_too_large [413] retry
+- error.415.unsupported_media_type [415] retry
+- error.422.unprocessable_entity [422] wait_and_retry
+- error.423.locked [423] wait_and_retry
+- error.423.verification_locked [423] wait_and_retry
+- error.429.rate_limit [429] wait_and_retry {retry_after_minutes}
+- error.429.too_many_requests [429] wait_and_retry
+- error.500.internal [500] contact_support
+- error.503.classified_blocks_unavailable [503] wait_and_retry
+- error.503.mandate_unavailable [503] retry

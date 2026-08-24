@@ -1,18 +1,36 @@
 # CONFIG.MD — stapel-classified
 
-Config registry ({static-scaffold-and-config.md} §2). This composite reads
-NO configuration keys of its own — every key belongs to a member module
-(shop (categories, attributes, listings, reviews), geo, search, moderation);
-see each member's CONFIG.MD (the scaffold aggregates them all
-into the generated project's CONFIG.MD automatically).
+Config registry ({static-scaffold-and-config.md} §2). Almost every key here
+belongs to a member module (shop (categories, attributes, listings,
+reviews), geo, search, moderation); see each member's CONFIG.MD (the
+scaffold aggregates them all into the generated project's CONFIG.MD
+automatically).
 
 Scenario defaults live in `stapel_classified.preset.SETTINGS_DEFAULTS` — they are
 settings-dict PRESETS for member keys, not new keys.
 
-## stapel-classified
+Since 0.2.0 the composite has a namespace of its OWN, because it owns one
+cross-domain JOIN (a chat conversation ↔ the listing it is about) and the
+reads off it. Every key in it is either an axis or a comm Function NAME:
+point one at your own provider and the answer changes with no fork.
+
+## stapel-classified — `STAPEL_CLASSIFIED`
 
 | Key | Source | Purpose | Required | Default |
 |-----|--------|---------|----------|---------|
+| BLOCK_ENFORCEMENT | env | `auto` (enforce where a block provider answers; announce at boot where none does) / `required` (a missing provider is a boot ERROR, `classified.E002`) / `off` (a disclosed statement, `classified.W002`). In every state a provider that is present and FAILS answers 503 — an outage is not consent. | no | `auto` |
+| BLOCK_FUNCTION | env | comm Function answering "is there a block between these two". `{"pairs": [[a,b],…]} -> {"blocked": [[a,b],…]}`, either direction. stapel-profiles owns the relationship and does not publish this yet. | no | `profiles.relationships` |
+| LISTING_DOCUMENTS_FUNCTION | env | Where every listing card comes from. Serves ALL statuses, which is why a card can say "sold" and "gone" where a public read 404s. | no | `listings.search_documents` |
+| DISPLAY_NAMES_FUNCTION | env | The counterparty's name. | no | `profiles.display_names` |
+| PUBLIC_PROFILE_FUNCTION | env | Avatar ref, member-since, seller type. **Empty**: no such function exists in the fleet yet, and naming one nobody serves would be a declared-and-unconnected dependency. Set it when profiles ships one. | no | `""` |
+| SELLER_RATING_FUNCTION | env | The rating aggregate for a seller card. | no | `reviews.aggregate` |
+| SELLER_RATING_TARGET_TYPE | env | The reviews target type a seller's rating is keyed under. Empty = this deployment has no seller reviews, and the card says `rating: null` rather than inventing a zero. | no | `""` |
+| MEDIA_DESCRIBE_FUNCTION | env | CDN render metadata for the card's primary image — the same contract stapel-chat uses for an attachment. | no | `cdn.describe_many` |
+| CARD_IMAGE_TIER | env | Widest CDN variant a card asks about. | no | `480` |
+| LISTING_URL_TEMPLATE | env | `{listing_id}` template for the card's public link. Empty = no link rather than an invented one. | no | `""` |
+| SELLER_URL_TEMPLATE | env | `{user_id}` template for the seller card's public link. | no | `""` |
+| CONTEXT_BATCH_LIMIT | env | Conversations resolved in one batch call (the inbox page). Kept at stapel-cdn's own describe_many ceiling. | no | `50` |
+| CALL_TIMEOUT_SECONDS | env | Per comm read, before a card degrades to its partial form. A chat that will not open because a rating service is slow is worse than a chat with no stars. | no | `5` |
 
 ## Member keys this preset fills in
 
@@ -23,6 +41,9 @@ Presets, not new keys — each one belongs to the member named in the header.
 | `STAPEL_SEARCH["SOURCES"]["listing"]` | `stapel_classified.search_sources.listing_source` | stapel-search ships an empty source registry: it knows nothing about listings, and listings knows nothing about an index. |
 | `STAPEL_MODERATION["TARGET_TYPES"]["listing"]` | pre-publication gate, `listings.moderation_content`, `listing_blocked` letter | stapel-moderation is target-generic and ships an empty registry. |
 | `STAPEL_MODERATION["TARGET_TYPES"]["review"]` | post-publication gate, `reviews.moderation_content`, no letter, narrowed reason list | same, for the other target. |
+| `STAPEL_MODERATION["TARGET_TYPES"]["seller"]` | post gate, `classified.seller_content` (served HERE), no verdict topic | a marketplace can be asked to act against a seller, and the fleet serves no `profiles.moderation_content` — so the composite serves the marketplace-shaped answer itself. |
+| `STAPEL_MODERATION["TARGET_TYPES"]["chat_message"]` | post gate, **evidence-based**, `can_report` = `classified.can_report_message` | nobody serves a chat message's content; the report carries the reporter's snapshot (moderation 0.2.0) and only the two parties of the thread may file one. |
+| `STAPEL_MODERATION["REASONS"]` | `prohibited_item`, `misleading_price`, `already_sold`, `impersonation` | the complaint taxonomy is universal and moderation ships one; these are the codes a MARKETPLACE needs on top, merged over the built-ins. |
 | `STAPEL_REVIEWS["TARGET_TYPES"]["listing"]` | post-moderated, one per author, responses allowed | stapel-reviews is target-generic and ships an empty registry. |
 
 ## Keys a host must still decide

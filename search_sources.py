@@ -108,16 +108,15 @@ def _card(payload: dict) -> dict:
     The display price rides along with ``price_base``: the base value is what
     sorts and filters across currencies, the written price is what a human
     reads.
+
+    The shape comes from ``cards._base_card``, which the conversation header
+    also builds on: a search hit and a chat header showing the same listing
+    differently would be two answers to one question, and one of them would
+    be wrong on the day somebody edited only one of the two builders.
     """
-    images = payload.get("images") or []
-    return {
-        "title": payload.get("title") or "",
-        "price": payload.get("price"),
-        "currency": payload.get("currency") or "",
-        "location_label": payload.get("location_label") or "",
-        "image": images[0] if images else None,
-        "published_at": payload.get("published_at"),
-    }
+    from .cards import _base_card
+
+    return _base_card(payload)
 
 
 def map_listing(payload: dict):

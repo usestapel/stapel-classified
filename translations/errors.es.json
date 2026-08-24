@@ -1,0 +1,7 @@
+{
+  "error.400.classified_own_listing": "No puedes iniciar una conversación de comprador sobre tu propio anuncio",
+  "error.403.classified_contact_refused": "No se puede contactar con este vendedor",
+  "error.404.classified_conversation_not_found": "Conversación no encontrada",
+  "error.404.classified_listing_not_found": "Este anuncio ya no existe",
+  "error.503.classified_blocks_unavailable": "Los contactos no están disponibles temporalmente, inténtalo en un momento"
+}

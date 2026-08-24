@@ -10,7 +10,7 @@
 [![license](https://img.shields.io/github/license/usestapel/stapel-classified)](https://github.com/usestapel/stapel-classified/blob/main/LICENSE)
 [![llms.txt](https://img.shields.io/badge/llms.txt-blue)](https://github.com/usestapel/stapel-classified/blob/main/docs/llms.txt)
 
-> Composite preset for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation. Carries the cross-domain declarations no member is allowed to write: the `listing` search source (listings.search_documents/search_export -> SearchDocumentInput, invalidated by listing.*) and the `listing`/`review` moderation target policies, plus the shop composite's ListingReviewSummaryProjection. Listing coordinates are the listing's own fields, not a projection. Mounts no urls of its own.
+> Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies and the marketplace reason taxonomy. Since 0.2.0 it also owns the one kind of state a composite may hold: the JOIN between a chat conversation and the listing it is about, because stapel-chat may not know what a listing is and stapel-listings may not know what a conversation is. Off that join it serves a conversation HEADER — the short listing card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone`, which is exactly the answer a public read cannot give) plus the counterparty's public seller card — and it enforces a user-to-user block at the one place a classified conversation begins, announcing at every boot whether that enforcement is live in this deployment.
 
 Part of the [Stapel framework](https://github.com/usestapel) — composable Django apps that deploy as a monolith or as microservices without changing module code.
 
@@ -24,13 +24,18 @@ pip install stapel-classified
 
 | Fact | Value |
 |---|---|
-| Version | `0.1.8` |
+| Version | `0.2.0` |
 | Python | `>=3.11` (3.11, 3.12, 3.13, 3.14) |
-| Fleet dependencies | [`stapel-attributes`](https://github.com/usestapel/stapel-attributes) · [`stapel-categories`](https://github.com/usestapel/stapel-categories) · [`stapel-geo`](https://github.com/usestapel/stapel-geo) · [`stapel-listings`](https://github.com/usestapel/stapel-listings) · [`stapel-moderation`](https://github.com/usestapel/stapel-moderation) · [`stapel-notifications`](https://github.com/usestapel/stapel-notifications) (optional) · [`stapel-reviews`](https://github.com/usestapel/stapel-reviews) · [`stapel-search`](https://github.com/usestapel/stapel-search) |
+| HTTP operations | 3 |
+| Config axes | 4 |
+| Usage surface | 9 |
+| Extension points | 3 |
+| Error codes | 47 |
+| Fleet dependencies | [`stapel-attributes`](https://github.com/usestapel/stapel-attributes) · [`stapel-categories`](https://github.com/usestapel/stapel-categories) · [`stapel-cdn`](https://github.com/usestapel/stapel-cdn) (optional) · [`stapel-chat`](https://github.com/usestapel/stapel-chat) (optional) · [`stapel-geo`](https://github.com/usestapel/stapel-geo) · [`stapel-listings`](https://github.com/usestapel/stapel-listings) · [`stapel-moderation`](https://github.com/usestapel/stapel-moderation) · [`stapel-notifications`](https://github.com/usestapel/stapel-notifications) (optional) · [`stapel-profiles`](https://github.com/usestapel/stapel-profiles) (optional) · [`stapel-reviews`](https://github.com/usestapel/stapel-reviews) · [`stapel-search`](https://github.com/usestapel/stapel-search) |
 
 ## Documentation
 
-[capabilities.json](https://github.com/usestapel/stapel-classified/blob/main/docs/capabilities.json) · [llms.txt (for agents)](https://github.com/usestapel/stapel-classified/blob/main/docs/llms.txt)
+[OpenAPI](https://github.com/usestapel/stapel-classified/blob/main/docs/schema.json) · [capabilities.json](https://github.com/usestapel/stapel-classified/blob/main/docs/capabilities.json) · [llms.txt (for agents)](https://github.com/usestapel/stapel-classified/blob/main/docs/llms.txt)
 
 ## Assemble (one line)
 
@@ -67,10 +72,10 @@ urlpatterns = [
 ]
 ```
 
-Mount from `preset.URL_INCLUDES` rather than by hand: `stapel-categories` and
-`stapel-listings` contribute only the `v1/` segment and belong under
-`<mod>/api/`, while `reviews`, `geo`, `search` and `moderation` bake `api/v1/`
-in themselves. Both end at `/<mod>/api/v1/...`, and getting it wrong is a
+Mount from `preset.URL_INCLUDES` rather than by hand: `stapel-classified`
+(its own conversation surface), `stapel-categories` and `stapel-listings`
+contribute only the `v1/` segment and belong under `<mod>/api/`, while
+`reviews`, `geo`, `search` and `moderation` bake `api/v1/` in themselves. Both end at `/<mod>/api/v1/...`, and getting it wrong is a
 `stapel_core.mounts.E004` refusal to boot, not a cosmetic difference.
 
 ## Config checklist (fill these, in the generated project's CONFIG.MD too)
@@ -79,7 +84,8 @@ in themselves. Both end at `/<mod>/api/v1/...`, and getting it wrong is a
 |-----|------|
 | `STAPEL_REVIEWS["TARGET_TYPES"]` | prefilled by the preset (targets `listing`) |
 | `STAPEL_SEARCH["SOURCES"]` | prefilled by the preset (the `listing` source) |
-| `STAPEL_MODERATION["TARGET_TYPES"]` | prefilled by the preset (`listing` pre-publication, `review` post) |
+| `STAPEL_MODERATION["TARGET_TYPES"]` | prefilled by the preset (`listing` pre-publication, `review`/`seller`/`chat_message` post) |
+| `STAPEL_CLASSIFIED["BLOCK_ENFORCEMENT"]` | `auto` — enforced where a block provider answers, and `manage.py check` says at every boot which state you are in. Set `required` once one does. |
 | `STAPEL_ACCESS["ROLES"]` | **yours** — the moderation console is staff-only; `preset.RECOMMENDED_ACCESS_ROLES` shows the shape |
 | `STAPEL_GDPR["DATA_OWNERS"]` | **yours** — must list `"moderation"`, or erasure never closes over complaint data |
 | `STAPEL_MODERATION["APPEAL_URL_TEMPLATE"]` | **yours** — an empty appeal link is what DSA Art. 17 notices |
@@ -106,6 +112,29 @@ a listing is. This package is the one place that knows both sides:
 
 Coordinates need no glue at all: they are the listing's OWN fields (lat/lon on
 the listing), not a foreign aggregate.
+
+## The conversation header (0.2.0)
+
+A chat in a classified marketplace is always ABOUT something and BETWEEN two
+identified people. Neither fact belongs to the messaging engine, so this
+composite owns the join and serves the header:
+
+```
+POST /classified/api/v1/conversations           bind a chat thread to a listing
+GET  /classified/api/v1/conversations/{id}      one header
+POST /classified/api/v1/conversations/contexts  a page of them, for the inbox
+```
+
+A header carries the **short listing card** — title, price, primary image
+with CDN render metadata, and a `state` of `available` / `unavailable`
+(sold, paused, expired) / `gone`, which is the answer a public listing read
+cannot give and exactly the case a buyer is most confused by — plus the
+**counterparty's public seller card**. Never more of a person than their
+public profile.
+
+`docs/frontend-contract.md` is the document the default skins build against:
+every payload, every refusal, and the six things the fleet does not serve yet
+with what the UI does about each in the meantime.
 
 ## License
 

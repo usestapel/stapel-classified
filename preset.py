@@ -30,15 +30,22 @@ INSTALLED_APPS = [
 
 # (url_prefix, urlconf_module) — mount each one with
 #   path(prefix, include(module))
-# The composite itself mounts NO urls (http=False): it only carries glue.
-# stapel-categories and stapel-listings contribute only the ``v1/`` segment
-# and expect the host to mount them under ``<mod>/api/`` (api-versioning.md
+#
+# Since 0.2.0 the composite mounts a surface of its OWN (`classified/api/`):
+# the conversation↔listing join and the cards read off it, which no member is
+# allowed to hold. Its STAPEL_LIBS entry therefore reads `http=True` — a
+# registry change routed to stapel-tools, see MODULE.md.
+#
+# stapel-classified, stapel-categories and stapel-listings contribute only
+# the ``v1/`` segment and expect the host to mount them under
+# ``<mod>/api/`` (api-versioning.md
 # §2, §6); stapel-reviews, geo, search and moderation bake ``api/v1/`` in
 # themselves. Mounting the first two at a bare ``<mod>/`` produced
 # ``/listings/v1/...``, which stapel-core's own mounts.E004 rejects — 40
 # errors from one prefix, and `manage.py check` was never run against this
 # preset until search and moderation arrived.
 URL_INCLUDES = [
+    ("classified/api/", "stapel_classified.urls"),
     ("categories/api/", "stapel_categories.urls"),
     ("listings/api/", "stapel_listings.urls"),
     ("reviews/", "stapel_reviews.urls"),
@@ -94,6 +101,45 @@ SETTINGS_DEFAULTS = {
         },
     },
     "STAPEL_MODERATION": {
+        # The complaint taxonomy is universal and stapel-moderation ships a
+        # non-empty one; these are the codes a MARKETPLACE needs on top, and
+        # they are declared here rather than upstream for the same reason the
+        # target types are: only this package knows the vertical. The registry
+        # merges over the built-ins, so a deployment adds its own without an
+        # upstream patch and removes one of these with `None`.
+        "REASONS": {
+            # A thing that may not be sold at all — weapons, medicines,
+            # wildlife. The highest severity in the marketplace set, because
+            # unlike a bad photo it is the platform's own legal exposure.
+            "prohibited_item": {
+                "severity": 4,
+                "requires_description": False,
+                "applies_to": ["listing"],
+            },
+            # A price that is not the price: bait figures, "from 1", a part
+            # sold as the whole. Cheap to file, cheap to check, and the most
+            # common complaint in every classified product there has been.
+            "misleading_price": {
+                "severity": 1,
+                "requires_description": False,
+                "applies_to": ["listing"],
+            },
+            # Still listed, no longer for sale. Severity 0: it is a catalogue
+            # hygiene signal, not misconduct, and queueing it as one would
+            # bury the reports that are.
+            "already_sold": {
+                "severity": 0,
+                "requires_description": False,
+                "applies_to": ["listing"],
+            },
+            # Pretending to be a shop, a brand or another member. Aimed at
+            # the two targets where identity is the product.
+            "impersonation": {
+                "severity": 3,
+                "requires_description": True,
+                "applies_to": ["seller", "chat_message"],
+            },
+        },
         # stapel-moderation is target-generic and ships an EMPTY
         # BUILTIN_TARGET_TYPES; this is the one place that knows what a
         # listing and a review are (moderation spec §16.8).
@@ -102,7 +148,9 @@ SETTINGS_DEFAULTS = {
         # of this composite and serves no `profiles.moderation_content`, so a
         # policy for it would be a declared target with an unreachable
         # content function — moderation.W006, and the exact "declared but not
-        # connected" defect the module exists to catch.
+        # connected" defect the module exists to catch. `seller` is a
+        # different thing and IS here: it is the marketplace's own notion of
+        # a counterparty, and this composite serves its content itself.
         "TARGET_TYPES": {
             "listing": {
                 # Pre-publication: a submitted listing waits for a verdict.
@@ -157,6 +205,99 @@ SETTINGS_DEFAULTS = {
                 # that do not exist would only cost prompt cache hits.
                 "media": False,
             },
+            "seller": {
+                # Post: a seller is live and a verdict sanctions them. There
+                # is no verdict TOPIC, because no module in the fleet applies
+                # a verdict to an account — the consequence of a case about a
+                # seller is a Sanction, which stapel-moderation issues itself
+                # against core's cross-service blacklist. Explicit None is a
+                # statement (moderation.W006 announces it) rather than an
+                # omission.
+                "gate": "post",
+                "intake_events": [],
+                "id_field": "seller_id",
+                # Served by THIS package (functions.py): the display name and
+                # rating a marketplace shows in public, with the seller's own
+                # id as author_id so "you cannot report yourself" holds
+                # without trusting a client.
+                "content_function": "classified.seller_content",
+                "verdict_event": None,
+                "notification_types": {},
+                # A person is not a listing: `wrong_category`, `counterfeit`
+                # and `misleading_price` are complaints about goods, and the
+                # place a verdict can remove goods is the listing.
+                "reasons": [
+                    "spam",
+                    "offensive",
+                    "harassment",
+                    "fraud",
+                    "illegal",
+                    "personal_data",
+                    "off_platform_payment",
+                    "impersonation",
+                    "other",
+                ],
+                # No pictures to screen — a seller card is a name and a
+                # number.
+                "media": False,
+            },
+            "chat_message": {
+                # EVIDENCE-BASED (stapel-moderation 0.2.0). stapel-chat
+                # serves no `chat.moderation_content` and stores no copy of a
+                # message anywhere this module could reach, so the report
+                # carries the reporter's own snapshot and that is what a
+                # moderator reads. Everything about it is marked unverified
+                # in the card; see stapel-moderation's MODULE.md for the
+                # exact limits of an attestation.
+                #
+                # The day stapel-chat ships a content function this entry
+                # becomes {"content_function": "chat.moderation_content"} and
+                # the evidence flag goes — one line, no migration, because
+                # nothing here stores the message.
+                "gate": "post",
+                "intake_events": [],
+                "evidence": True,
+                # Only the two people in the thread may complain about what
+                # was said in it. moderation's default for a missing callback
+                # is fail-OPEN, which is right for a public listing and wrong
+                # for a private conversation — and this composite is the only
+                # package in the fleet that can answer the question at all,
+                # because it holds the conversation↔parties join.
+                "can_report": "classified.can_report_message",
+                # Nothing to send a verdict to: a message cannot be taken
+                # down by anyone but chat, which consumes no verdict. The
+                # consequence of a case about a message is a Sanction on its
+                # author, exactly as for `seller`.
+                "verdict_event": None,
+                "notification_types": {},
+                "reasons": [
+                    "spam",
+                    "offensive",
+                    "harassment",
+                    "fraud",
+                    "illegal",
+                    "adult",
+                    "personal_data",
+                    "off_platform_payment",
+                    "impersonation",
+                    "other",
+                ],
+                # Screening reads the attestation, which is text; a chat
+                # attachment's bytes live in the CDN and are not quoted into
+                # a report.
+                "media": False,
+            },
         },
+    },
+    # The composite's own namespace. Everything in it is either an axis or a
+    # comm Function name — see conf.py for why there is no registry here.
+    "STAPEL_CLASSIFIED": {
+        # The seller rating shown in a conversation header. Empty in the
+        # shipped preset because THIS composite registers reviews about
+        # `listing`, not about sellers: a deployment that adds a `seller`
+        # reviews target sets this to that name and the stars appear. A name
+        # declared here without the reviews target behind it would be a
+        # rating that is always null and a lookup that always misses.
+        "SELLER_RATING_TARGET_TYPE": "",
     },
 }

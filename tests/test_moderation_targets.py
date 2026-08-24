@@ -45,10 +45,64 @@ def test_no_profile_target_is_declared():
     ``profile`` would put a policy in the registry pointing at
     ``profiles.moderation_content`` — unreachable, and the exact
     "declared but not connected" shape this module exists to catch.
+
+    ``seller`` is NOT that. It is the marketplace's own notion of a
+    counterparty and this package serves its content itself
+    (``classified.seller_content``), which is the whole difference: the
+    content function has a provider in the process.
     """
     from stapel_moderation.registry import get_target_types
 
-    assert set(get_target_types()) == {"listing", "review"}
+    declared = set(get_target_types())
+    assert declared == {"listing", "review", "seller", "chat_message"}
+    assert "profile" not in declared
+
+
+def test_the_seller_target_serves_its_own_content():
+    from stapel_core.comm import call, function_unreachable_reason
+    from stapel_moderation.registry import resolve_policy
+
+    policy = resolve_policy("seller")
+    assert policy["content_function"] == "classified.seller_content"
+    assert policy["id_field"] == "seller_id"
+    # Declared and CONNECTED: the provider is this package.
+    assert not function_unreachable_reason("classified.seller_content")
+
+    answer = call("classified.seller_content", {"seller_id": "u-1"})
+    # The seller authors their own storefront — this is what makes
+    # "you cannot report yourself" answerable without trusting a client.
+    assert answer["author_id"] == "u-1"
+
+
+def test_the_chat_message_target_is_evidence_based():
+    """No module in the fleet serves a chat message's content, so a report
+    carries the reporter's snapshot — stapel-moderation 0.2.0's evidence
+    seam, which exists for exactly this shape of target."""
+    from stapel_moderation.registry import resolve_policy
+
+    policy = resolve_policy("chat_message")
+    assert policy["evidence"] is True
+    assert policy["content_function"] == ""
+    # A message cannot be taken down by anyone but chat, and chat consumes no
+    # verdict: the consequence of a case about a message is a Sanction.
+    assert policy["verdict_event"] is None
+
+
+def test_the_marketplace_reasons_merge_over_the_universal_ones():
+    """An open registry, exercised: the vertical's codes ride on top of the
+    shipped taxonomy, and the shipped ones are still there."""
+    from stapel_moderation.registry import get_reasons, reasons_for_target
+
+    reasons = get_reasons()
+    assert reasons["prohibited_item"]["severity"] == 4
+    assert reasons["already_sold"]["severity"] == 0
+    assert "spam" in reasons  # the built-in taxonomy survives the merge
+
+    listing = set(reasons_for_target("listing"))
+    assert {"prohibited_item", "misleading_price", "already_sold"} <= listing
+    # A complaint about goods has no meaning against a person.
+    assert "misleading_price" not in set(reasons_for_target("seller"))
+    assert "impersonation" in set(reasons_for_target("seller"))
 
 
 def test_both_content_functions_are_reachable():

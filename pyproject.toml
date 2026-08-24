@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.1.8"
+version = "0.2.0"
 description = "Composite: classified ads — the shop composite + geo + search + moderation"
 readme = "README.md"
 license = { text = "MIT" }
@@ -38,13 +38,13 @@ classifiers = [
 # whatever floor stapel-shop asks for and silently regress the seam this
 # composite is the one place that can prove.
 dependencies = [
-    "stapel-core>=0.32,<1.0",
+    "stapel-core>=0.43,<1.0",
     "stapel-shop>=0.2.3,<0.3",
     "stapel-categories>=0.5.6,<0.6",
     "stapel-listings>=0.5,<0.8",
     "stapel-geo>=0.2,<0.4",
     "stapel-search>=0.2.2,<0.3",
-    "stapel-moderation>=0.1,<0.2",
+    "stapel-moderation>=0.2,<0.3",
 ]
 
 [project.urls]
@@ -59,10 +59,10 @@ all = []
 
 [tool.setuptools]
 package-dir = {"stapel_classified" = "."}
-packages = ["stapel_classified", "stapel_classified.tests"]
+packages = ["stapel_classified", "stapel_classified.tests", "stapel_classified.migrations"]
 
 [tool.setuptools.package-data]
-stapel_classified = ["py.typed", "docs/capabilities.json", "docs/llms.txt", "docs/flows.json", "docs/errors.json", "CONFIG.MD"]
+stapel_classified = ["py.typed", "docs/capabilities.json", "docs/llms.txt", "docs/flows.json", "docs/errors.json", "docs/schema.json", "docs/frontend-contract.md", "CONFIG.MD", "schemas/functions/*.json", "translations/*.json"]
 
 [tool.ruff]
 target-version = "py311"

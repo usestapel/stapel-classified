@@ -13,8 +13,11 @@ def test_preset_is_coherent():
     assert "stapel_classified" in preset.INSTALLED_APPS
     prefixes = [p for p, _ in preset.URL_INCLUDES]
     assert len(prefixes) == len(set(prefixes))
-    # The composite mounts no urls of its own (http=False — glue only).
-    assert not any(m.startswith("stapel_classified") for _, m in preset.URL_INCLUDES)
+    # Since 0.2.0 the composite DOES mount a surface of its own: the
+    # conversation-subject join no member is allowed to hold. It is mounted
+    # under `<mod>/api/` like the members that contribute only `v1/`.
+    mine = [p for p, m in preset.URL_INCLUDES if m.startswith("stapel_classified")]
+    assert mine == ["classified/api/"]
     # Every mounted module is an installed app (or a nested urlconf of one).
     for _prefix, module in preset.URL_INCLUDES:
         assert module.rsplit(".", 1)[0] in preset.INSTALLED_APPS
@@ -80,9 +83,31 @@ def test_system_checks_report_no_errors():
 
     unexpected = [
         f for f in findings
-        if f.id not in ("stapel_core.access.W005", "stapel_core.blacklist.W002")
+        if f.id not in (
+            "stapel_core.access.W005",
+            "stapel_core.blacklist.W002",
+            # Declared statements, each announced on purpose:
+            #   moderation.W006 — `seller` and `chat_message` consume no
+            #     verdict topic, because nothing in the fleet applies a
+            #     verdict to an account or to a message; their consequence is
+            #     a Sanction. The check exists so that is a decision, not a
+            #     forgotten key.
+            #   classified.W001 — no block provider is reachable here, so
+            #     blocks are not enforced. That is the FLEET's state today
+            #     (stapel-profiles owns the relationship and publishes no
+            #     comm read of it) and the whole point of the check is that a
+            #     deployment is told at every boot instead of assuming.
+            "stapel_moderation.W006",
+            "stapel_classified.W001",
+        )
     ]
     assert unexpected == [], [str(f) for f in unexpected]
+
+    # …and the two that ARE expected must actually be there: a check that
+    # stopped firing would leave the same silence it was written to break.
+    ids = {f.id for f in findings}
+    assert "stapel_classified.W001" in ids
+    assert "stapel_moderation.W006" in ids
 
 
 def test_moderation_verdicts_are_not_crossed_between_members():

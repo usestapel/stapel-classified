@@ -1,6 +1,176 @@
 {
-  "_comment": "Curated layer for the `surface` section of docs/capabilities.json (discoverability-design.md §1.2). stapel-classified is a COMPOSITE PRESET (projections-and-composition §3): INSTALLED_APPS/urls/config wiring over the stapel-shop scenario (categories + listings + reviews) plus stapel-geo, with location kept as the listing's own fields. It has no gate registry and no docs/schema.json — provides/axes/extension_points/requires stay hand-written and are NOT drift-gated here. `surface_roots` is deliberately empty: apps.py has no permission classes, no public functions, no capability fields and no templates of its own — the composite's whole job is transparent glue, so there is nothing here a product should call INSTEAD of reaching into the member modules (stapel-categories, stapel-listings, stapel-reviews, stapel-geo) directly. `make contract` still refreshes module/version from pyproject and would fail loudly the moment this module grows a real symbol without an intent line for it.",
-  "surface_roots": [],
-  "surface": {},
-  "no_surface": "Composite preset: apps.py + preset.py only assemble the classifieds bundle (INSTALLED_APPS + URL_INCLUDES). Nothing here is callable; the surface a product wants belongs to the bundled modules."
+  "_comment": "Hand-curated layer of docs/capabilities.json (capability-config.md §2 p.3). The emitter (stapel_classified/_capabilities.py) merges this over the derived axes; an axis in conf.py DEFAULTS missing here (or vice versa) is a loud emission error. Until 0.2.0 this file said the composite had no surface at all, which was true of a package that served no HTTP and owned no state. It now owns one cross-domain JOIN (conversation <-> listing) and the reads off it, so the surface is real and stated. The AXES are the settings that change what the product does to people: whether a block is enforced at all, and which providers answer the questions a conversation header asks. Batch limits, timeouts and image tiers are tuning and deliberately not axes. Deliberately NOT rooted in surface_roots: functions.py (comm surface, reached by name over the bus, never imported), checks.py (Django check callbacks), search_sources.py (resolved by dotted path out of STAPEL_SEARCH['SOURCES'], never called directly), preset.py (plain data a settings module copies).",
+  "provides": "Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies and the marketplace reason taxonomy. Since 0.2.0 it also owns the one kind of state a composite may hold: the JOIN between a chat conversation and the listing it is about, because stapel-chat may not know what a listing is and stapel-listings may not know what a conversation is. Off that join it serves a conversation HEADER — the short listing card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone`, which is exactly the answer a public read cannot give) plus the counterparty's public seller card — and it enforces a user-to-user block at the one place a classified conversation begins, announcing at every boot whether that enforcement is live in this deployment.",
+  "requires": [
+    {
+      "module": "stapel-categories",
+      "optional": false,
+      "reason": "composite member, inherited from the shop scenario (preset.py INSTALLED_APPS/URL_INCLUDES)"
+    },
+    {
+      "module": "stapel-listings",
+      "optional": false,
+      "reason": "composite member — the classified ad itself (preset.py INSTALLED_APPS/URL_INCLUDES)"
+    },
+    {
+      "module": "stapel-reviews",
+      "optional": false,
+      "reason": "composite member, inherited from the shop scenario (preset.py INSTALLED_APPS/URL_INCLUDES)"
+    },
+    {
+      "module": "stapel-geo",
+      "optional": false,
+      "reason": "composite member — location binding for classified ads (preset.py INSTALLED_APPS/URL_INCLUDES)"
+    },
+    {
+      "module": "stapel-attributes",
+      "optional": false,
+      "reason": "L1 library dependency of stapel-categories/stapel-listings; pip dependency, not a Django app (preset.py comment)"
+    },
+    {
+      "module": "stapel-search",
+      "optional": false,
+      "reason": "composite member — the index, facets and geo radius over listings; the composite declares its `listing` source (preset.py SETTINGS_DEFAULTS, search_sources.py)"
+    },
+    {
+      "module": "stapel-moderation",
+      "optional": false,
+      "reason": "composite member — the cross-target queue; the composite declares its `listing`/`review`/`seller`/`chat_message` target policies and the marketplace reasons (preset.py SETTINGS_DEFAULTS). 0.2.0+ is required for the evidence-based target type a chat message needs"
+    },
+    {
+      "module": "stapel-notifications",
+      "optional": true,
+      "reason": "not a member; when co-installed it routes the moderation letters (`listing_blocked`, `moderation.*`) the target policies name — absent, no letter is sent and nothing pretends one was"
+    },
+    {
+      "module": "stapel-chat",
+      "optional": true,
+      "reason": "not a member and never imported — the conversation ids this composite binds subjects to are chat's. Absent, the join table simply stays empty"
+    },
+    {
+      "module": "stapel-cdn",
+      "optional": true,
+      "reason": "reached by name (`cdn.describe_many`) for the card image's render metadata — the same contract stapel-chat uses for an attachment. Absent, the card keeps the image ref and says `meta_status: partial`"
+    },
+    {
+      "module": "stapel-profiles",
+      "optional": true,
+      "reason": "reached by name for the counterparty card (`profiles.display_names`) and for block enforcement (`profiles.relationships`, which profiles does not publish yet). Absent, the seller card is `partial` and `manage.py check` prints classified.W001 saying blocks are not enforced here"
+    }
+  ],
+  "extension_points": [
+    {
+      "name": "STAPEL_CLASSIFIED comm Function names",
+      "kind": "settings",
+      "summary": "Every read the conversation header makes is a comm Function NAME in this module's settings namespace — the listing documents, the display names, the public profile card, the seller rating, the CDN describe. Point one at your own provider and the answer changes with no fork and no release."
+    },
+    {
+      "name": "STAPEL_MODERATION / STAPEL_SEARCH / STAPEL_REVIEWS declarations",
+      "kind": "settings",
+      "summary": "preset.SETTINGS_DEFAULTS is plain data: the search source, the four moderation target policies and the marketplace reason codes. All three registries merge over their built-ins, so a deployment adds a reason or removes a target type in its own settings rather than upstream."
+    },
+    {
+      "name": "SerializerSeamMixin on every view",
+      "kind": "subclass",
+      "summary": "core's hoisted serializer seam: subclass a view, set request_serializer_class / response_serializer_class, remount the URL. No HTTP method body is ever copied."
+    }
+  ],
+  "axes": {
+    "BLOCK_ENFORCEMENT": {
+      "business_label": "Is a block actually enforced",
+      "summary": "Auto: enforced wherever a block provider answers, and where none is registered the deployment is told at every boot that blocks are not enforced here — the state the fleet is in today, printed rather than assumed. 'required' turns a missing provider into a boot error and is the posture for a deployment that runs a profile service; 'off' is a disclosed statement. In every state a provider that is present and FAILS answers 503, never 'allowed': an outage is not consent."
+    },
+    "BLOCK_FUNCTION": {
+      "business_label": "Where a block is looked up",
+      "summary": "The comm Function that answers 'is there a block between these two people'. A block belongs to the profile service and this composite keeps no copy of one; it asks, at the single place a classified conversation begins."
+    },
+    "PUBLIC_PROFILE_FUNCTION": {
+      "business_label": "How much of a seller the card can show",
+      "summary": "Empty by default because no such function exists in the fleet yet: the counterparty card then carries the display name and the rating and says, in the payload, that the avatar and member-since are missing and why. Naming a function that nobody serves would be a declared-and-unconnected dependency, which is the defect class this fleet gates against."
+    },
+    "SELLER_RATING_TARGET_TYPE": {
+      "business_label": "Whether sellers carry a rating",
+      "summary": "Empty in the shipped scenario, because this composite registers reviews about listings rather than about people. A deployment that adds a seller review target names it here and the stars appear in every conversation header — with no release. Empty means the card says 'no rating', never a fabricated zero."
+    }
+  },
+  "surface_roots": [
+    {
+      "select": "functions",
+      "path": "services.py"
+    },
+    {
+      "select": "functions",
+      "path": "cards.py"
+    },
+    {
+      "select": "functions",
+      "path": "blocks.py"
+    }
+  ],
+  "surface": {
+    "bind_listing_conversation": {
+      "kind": "factory",
+      "intent": "Record that a chat conversation is about a listing — the 'write to the seller' moment. Resolves the seller, refuses self-contact, enforces the block, and is idempotent per (conversation, listing).",
+      "instead_of": [
+        "storing a listing_id on your own chat model"
+      ]
+    },
+    "conversation_context": {
+      "kind": "factory",
+      "intent": "One conversation's header: the short listing card (including sold and deleted, which is when a buyer is most confused) and the counterparty's public seller card, from the reader's side.",
+      "instead_of": [
+        "fetching the listing and the profile separately in a client"
+      ]
+    },
+    "conversation_contexts": {
+      "kind": "factory",
+      "intent": "The batch form the inbox calls: a bounded page of headers in two comm reads, instead of one round trip per row.",
+      "instead_of": [
+        "looping conversation_context over a conversation list"
+      ]
+    },
+    "current_subject": {
+      "kind": "factory",
+      "intent": "The newest subject recorded for a conversation — the header's listing, when a thread has carried more than one.",
+      "instead_of": [
+        "ConversationSubject.objects.filter(...).first()"
+      ]
+    },
+    "listing_cards": {
+      "kind": "factory",
+      "intent": "Keyed batch of short listing cards, gone ones included, with the CDN render metadata already merged over the primary image.",
+      "instead_of": [
+        "calling listings.search_documents and formatting a card yourself"
+      ]
+    },
+    "seller_cards": {
+      "kind": "factory",
+      "intent": "Keyed batch of PUBLIC seller cards — never more of a person than their public profile, whatever the caller holds.",
+      "instead_of": [
+        "reading a Profile row or a User row for a chat header"
+      ]
+    },
+    "is_blocked": {
+      "kind": "gate_function",
+      "intent": "Whether a block stands between two users, in either direction, under this deployment's declared enforcement posture. Raises rather than answering False when a configured provider fails.",
+      "instead_of": [
+        "querying a relationship table",
+        "hiding the button in the UI"
+      ]
+    },
+    "blocked_pairs": {
+      "kind": "gate_function",
+      "intent": "The batch form: which of these pairs are blocked, in one call.",
+      "instead_of": [
+        "calling is_blocked in a loop"
+      ]
+    },
+    "provider_unreachable_reason": {
+      "kind": "gate_function",
+      "intent": "Why the configured block provider cannot be called here, or an empty string — what the boot check prints and what tells the difference between 'no blocks in this deployment' and 'the block store is down'.",
+      "instead_of": [
+        "assuming a comm function is reachable"
+      ]
+    }
+  }
 }
