@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.1.6] — 2026-08-24
+## [0.1.7] — 2026-08-24
 
 ### Changed — pins admit `stapel-search` 0.2.2 (the geo prefilter fix)
 
@@ -15,6 +15,12 @@ carry it instead of the broken 0.1.x line. Verified in a clean venv on
 released search 0.2.2 (installed over the shared workspace venv's existing
 member versions): full composite suite green (50 passed), no new `pip
 check` conflicts introduced by the search pin.
+
+Note: v0.1.6 was tagged and pushed but never published — its CI run failed
+the contract drift gate (`docs/capabilities.json`/README/llms.txt still
+read 0.1.5) before the publish job could start, so nothing reached PyPI
+under that tag. This release regenerates the contract artifacts via `make
+contract` and carries the same search-pin change forward as 0.1.7.
 
 ## [0.1.5] — 2026-08-23
 
