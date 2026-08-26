@@ -18,18 +18,20 @@ So the harness ships with the module. Two backends, one API:
   A stated double, chosen by the absence of the real thing, rather than a
   silent one that shadows it.
 
-Use it from pytest::
-
-    # conftest.py
-    pytest_plugins = ("stapel_classified.testing",)
+Use it from pytest — there is nothing to wire, the ``pytest11`` entry point
+loads it for anyone who has this package installed::
 
     def test_a_blocked_buyer_cannot_write(block_provider, buyer, seller):
         block_provider.block(seller, buyer)
         ...
 
-(The ``pytest11`` entry point makes it load automatically for anyone who has
-this package installed; naming it in ``pytest_plugins`` is the explicit form
-and does not depend on installed metadata being fresh.)
+**Do not also name it in ``pytest_plugins``.** pytest registers an
+entry-point plugin under its entry-point name; a ``pytest_plugins`` entry
+registers the same module under its module name, and the second registration
+raises ``ValueError: Plugin already registered under a different name``.
+(0.3.2 shipped that line, passed on a machine whose editable install predated
+the entry point, and died on the runner. 0.3.3 is the fix, and
+``test_the_shipped_pytest_plugin_is_registered_exactly_once`` is the gate.)
 
 Outside pytest, :func:`memory_block_provider` is a context manager with the
 same API.

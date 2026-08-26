@@ -1,6 +1,42 @@
 # Changelog
 
-## 0.3.2 — 2026-08-26
+## 0.3.3 — 2026-08-26
+
+### Fixed — the shipped pytest plugin registered itself twice
+
+**0.3.2 was tagged and never reached PyPI**: its test job died on every Python
+version with `ValueError: Plugin already registered under a different name:
+stapel_classified.testing`. The new harness is delivered by a `pytest11`
+entry point AND was named in this repo's `conftest.py` `pytest_plugins`;
+pytest registers an entry-point plugin under its entry-point name and a
+`pytest_plugins` entry under its module name, so the second registration of
+the same module is a hard error. **0.3.2 does not exist on PyPI — floor on
+`>=0.3.3`**; this release is 0.3.2's feature set unchanged (see below) plus
+the fix.
+
+It passed locally for the most boring possible reason: the editable install in
+the development virtualenv predated the entry point, so only one of the two
+registrations happened here. That is the same "green in my venv, red on a
+clean runner" shape the sibling-declaration gate was added for in this very
+release — which is why the fix is also a gate:
+`test_the_shipped_pytest_plugin_is_registered_exactly_once` asserts both
+directions (zero registrations silently removes every fixture; two is this
+crash).
+
+### Changed — the frontend contract catches up with what shipped
+
+`docs/frontend-contract.md` §5 and §7 still told the react pair to hide the
+composer "knowing it is not enforcement" and to expect two calls at §2.1.
+Four of the six gaps that section listed are closed (chat 0.6.0: subjects,
+subject-aware `direct_key`, `conversation.created`, the participants read;
+profiles 0.16.0: the public-profile card), struck rather than deleted so a
+reader can check what a routed ask turned into. The one that remains is
+named precisely: chat enforces blocks **at send**, not at conversation
+create, so `POST /classified/api/v1/conversations` is what refuses a blocked
+contact — call it, and do not read chat's 201 as "allowed". §6 gains
+`error.503.classified_chat_unavailable`.
+
+## 0.3.2 — 2026-08-26 (tagged, never published — see 0.3.3)
 
 ### ⚠️ BREAKING — `ConversationSubject` is deleted, and the header is read from chat
 

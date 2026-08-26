@@ -119,8 +119,11 @@ is the default working. It is also a trap: 0.3.1's own publish job died with
 default — is the wrong one every time.
 
 So the harness ships WITH the module: **`stapel_classified.testing`**, a
-pytest plugin (`pytest11` entry point, so it loads for anyone who installs
-this package; name it in `pytest_plugins` for the explicit form).
+pytest plugin. Its `pytest11` entry point loads it for anyone who installs
+this package — there is nothing to wire, and **it must not also be named in
+`pytest_plugins`** (pytest registers an entry-point plugin under its
+entry-point name and a `pytest_plugins` entry under its module name, and the
+second one raises `Plugin already registered under a different name`).
 
 ```python
 def test_a_blocked_buyer_cannot_write(block_provider, buyer, seller):

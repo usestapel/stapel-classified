@@ -380,10 +380,15 @@ UI rules:
   conversation from the list; mark it.
 - **Never disclose direction.** The refusal does not say who blocked whom,
   and the copy must not either.
-- **Do not enforce in the client only.** Today the *message send* path in
-  chat is not yet block-aware (§7), so a client that merely hides the compose
-  box is the whole enforcement. Hide it — and know that it is a stopgap, not
-  the guarantee.
+- **The server enforces it now — stop treating the UI as the guarantee.**
+  stapel-chat 0.6.0 checks the same block on **every send** (403
+  `error.403.chat_send_refused`), and this composite checks it when a contact
+  is opened (§2.1, 403). Hiding the composer is a courtesy so a user does not
+  type into a refusal; it is no longer the enforcement, and a client that
+  skips it changes nothing about what the server allows.
+- **A 503 from either check is not "allowed".** `classified_blocks_unavailable`
+  and chat's `chat_blocks_unavailable` both mean the block store could not be
+  asked. Offer a retry; never fall through to sending.
 
 ## 6. Failure vocabulary, in one place
 
@@ -394,6 +399,7 @@ UI rules:
 | 404 | `error.404.classified_listing_not_found` | no | "This listing no longer exists" |
 | 404 | `error.404.classified_conversation_not_found` | no | render the chat with no header |
 | 503 | `error.503.classified_blocks_unavailable` | **yes** | "Try again in a moment" |
+| 503 | `error.503.classified_chat_unavailable` | **yes** | "Try again in a moment" — and never as "no header": chat could not be asked at all |
 
 Every error body is core's envelope: `{"localizable_error": "<key>", …}`.
 Translate by key; never show the English string a server sent.
@@ -403,12 +409,18 @@ Translate by key; never show the English string a server sent.
 These are routed upstream and named so the pair can build against the shape
 that is coming instead of inventing its own:
 
+Four of the six gaps this section listed at 0.3.0 are **closed** — chat 0.6.0
+shipped subjects, subject-aware `direct_key`, `conversation.created` and a
+participants read; profiles 0.16.0 shipped the public-profile card. The
+consequences are in §2.1 and §3.3, and the entries are struck rather than
+deleted so a reader can check what a routed ask actually turned into.
+
 | Gap | Owner | What the skin does today |
 |---|---|---|
-| Conversation subject in chat itself (`subject_type`/`subject_key`, subject in `direct_key`, a `SUBJECT_TYPES` registry with a `card_function`) | stapel-chat | Two calls at §2.1, and `previous_subjects` for the shared-thread case. |
-| `conversation.created` event / a server-side create function | stapel-chat | The client creates in chat, then binds here. Do not try to bind from a server. |
-| Block enforcement on message send | stapel-chat + stapel-profiles | Hide the composer for a blocked pair, knowing it is not enforcement. |
-| A public-profile comm read (avatar, member-since, seller type) | stapel-profiles | Initials placeholder; `meta_reason: "profile_unavailable"`. |
+| ~~Conversation subject in chat itself~~ | stapel-chat | **Shipped (0.6.0)** — pass `subject_type`/`subject_key` to chat's create (§2.1). `previous_subjects` is gone. |
+| ~~`conversation.created` / server-side create~~ | stapel-chat | **Shipped (0.6.0).** The client still creates the thread; there is nothing to bind afterwards. |
+| ~~A public-profile comm read~~ | stapel-profiles | **Shipped (0.16.0)** — `avatar`, `member_since`, `seller_type` arrive where profiles is deployed. Initials remain the renderer for an empty `display_name` (§3.3). |
+| **Block enforcement when a conversation is CREATED** | stapel-chat | Chat enforces blocks on every SEND since 0.6.0 — the half no client can bypass. It does not check at create, so a blocked buyer can still open an empty thread that appears in the blocker's inbox; `POST /classified/api/v1/conversations` (§2.1) is what refuses that, and only for clients that call it. **Call it.** Do not treat chat's 201 as "the contact is allowed". |
 | Seller ratings | deployment | `rating: null` unless the deployment registers a seller review target. |
 
 Never paper over one of these by reading another service's REST from a

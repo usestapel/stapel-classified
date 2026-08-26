@@ -163,3 +163,19 @@ def test_a_declared_sibling_is_actually_importable_here(module):
             "the `test` extra did not do what the workflow says it does."
         )
     pytest.skip(f"{_dist_name(module)} not installed: `pip install -e '.[test]'`")
+
+
+def test_the_shipped_pytest_plugin_is_registered_exactly_once(pytestconfig):
+    """The harness reaches a consumer through its entry point, and only that.
+
+    Both halves are asserted because both have a failure mode: registered
+    zero times means the fixtures this suite (and every consumer's) depends on
+    silently vanish, and registered twice is the `ValueError` that killed the
+    v0.3.2 publish job — a `pytest_plugins` line next to the entry point.
+    """
+    registered = [
+        name
+        for name, plugin in pytestconfig.pluginmanager.list_name_plugin()
+        if getattr(plugin, "__name__", "") == "stapel_classified.testing"
+    ]
+    assert len(registered) == 1, registered

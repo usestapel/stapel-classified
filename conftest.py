@@ -1,8 +1,14 @@
-#: The block harness this module SHIPS (`stapel_classified.testing`), used
-#: here rather than hand-rolled — a fixture a consumer cannot import is a
-#: fixture every consumer rewrites. Named explicitly rather than left to the
-#: pytest11 entry point, so a stale editable install cannot silently drop it.
-pytest_plugins = ("stapel_classified.testing",)
+# The block harness this module SHIPS (`stapel_classified.testing`) is loaded
+# by its `pytest11` entry point — the same way a consumer gets it, so this
+# suite exercises the real delivery mechanism rather than a private import.
+#
+# Do NOT also name it in `pytest_plugins`: pytest registers an entry-point
+# plugin under its entry-point name and a `pytest_plugins` entry under its
+# module name, and the second registration of the same module is
+# `ValueError: Plugin already registered under a different name`. It passed
+# here and died on the runner for one release, because a stale editable
+# install had not yet recorded the entry point — the same "green in my venv"
+# shape `tests/test_test_dependencies.py` exists for.
 
 
 def pytest_configure(config):
