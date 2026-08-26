@@ -26,27 +26,30 @@ from stapel_classified import services
 pytestmark = pytest.mark.django_db
 
 
-def _bind(listing, buyer):
-    conversation = uuid.uuid4()
-    services.bind_listing_conversation(
-        conversation_id=conversation, listing_key=listing.pk, actor_id=buyer.pk
+def _empty_thread(listing, buyer, seller):
+    """A REAL chat thread about ``listing``, with no message in it yet."""
+    from stapel_chat import services as chat
+
+    return chat.create_direct(
+        owner=buyer,
+        other_user_id=seller.pk,
+        subject_type="listing",
+        subject_key=str(listing.pk),
     )
-    return conversation
 
 
 def _thread(listing, buyer, seller, *, body="Send the deposit to my card."):
-    """A REAL chat thread about ``listing``, bound here, one message in it.
+    """A REAL chat thread about ``listing`` with one message in it.
 
     The message is the SELLER's, so the buyer reporting it is not reporting
     themselves. Returns the conversation, the message, and the composite key
-    a report names it by.
+    a report names it by. Nothing is recorded HERE any more: the subject is
+    part of the thread's identity in chat since its 0.6.0, and who may report
+    what was said in it is answered by asking chat who is in it.
     """
     from stapel_chat import services as chat
 
-    conversation = chat.create_direct(owner=buyer, other_user_id=seller.pk)
-    services.bind_listing_conversation(
-        conversation_id=conversation.id, listing_key=listing.pk, actor_id=buyer.pk
-    )
+    conversation = _empty_thread(listing, buyer, seller)
     message = chat.post_message(conversation=conversation, sender=seller, body=body)
     return conversation, message, f"{conversation.id}:{message.id}"
 
@@ -57,11 +60,17 @@ def _thread(listing, buyer, seller, *, body="Send the deposit to my card."):
 def test_this_package_owns_no_queue():
     """A composite that grew its own Case table would be the second answer to
     "where do complaints live" — the defect stapel-moderation was built to
-    end. The join table is the only model here."""
+    end.
+
+    Since 0.3.2 this package owns NO model at all: ``ConversationSubject`` was
+    the one table it ever had, and it existed only to work around a chat that
+    could not tell two threads apart. Chat can, so the table is gone rather
+    than kept in sync — and a composite with an empty model registry is the
+    strongest possible form of "the join is a read, not a copy"."""
     from django.apps import apps
 
     models = {m.__name__ for m in apps.get_app_config("classified").get_models()}
-    assert models == {"ConversationSubject"}
+    assert models == set()
 
 
 # ── Reporting a listing (already declared, still true) ───────────────
@@ -88,11 +97,11 @@ def test_a_listing_report_opens_a_case_with_the_marketplace_reason(
 
 
 def test_a_seller_report_reads_the_seller_from_this_package(
-    published_listing, other_user, user, profiles_double
+    published_listing, other_user, user, display_name
 ):
     from stapel_moderation import services as moderation
 
-    profiles_double["display_names"][str(user.pk)] = "Ada Lovelace"
+    display_name(user, "Ada Lovelace")
     _report, case = moderation.submit_report(
         target_type="seller",
         target_key=str(user.pk),
@@ -204,11 +213,10 @@ def test_a_message_quoted_under_the_wrong_conversation_is_not_the_target(
     from stapel_moderation import services as moderation
 
     _conversation, message, _key = _thread(published_listing, other_user, user)
-    other_thread = chat.create_group(owner=other_user)
-    services.bind_listing_conversation(
-        conversation_id=other_thread.id,
-        listing_key=published_listing.pk,
-        actor_id=other_user.pk,
+    other_thread = chat.create_group(
+        owner=other_user,
+        subject_type="listing",
+        subject_key=str(published_listing.pk),
     )
 
     with pytest.raises(moderation.TargetNotFound):
@@ -221,7 +229,7 @@ def test_a_message_quoted_under_the_wrong_conversation_is_not_the_target(
 
 
 def test_an_outsider_cannot_report_a_message_from_a_thread_they_are_not_in(
-    published_listing, other_user, db
+    published_listing, other_user, user, db
 ):
     """The whole reason a message's moderation key carries its conversation.
 
@@ -236,12 +244,12 @@ def test_an_outsider_cannot_report_a_message_from_a_thread_they_are_not_in(
     stranger = get_user_model().objects.create(
         username="mallory3", email="mallory3@example.com"
     )
-    conversation = _bind(published_listing, other_user)
+    conversation = _empty_thread(published_listing, other_user, user)
 
     with pytest.raises(moderation.CannotReport):
         moderation.submit_report(
             target_type="chat_message",
-            target_key=f"{conversation}:{uuid.uuid4()}",
+            target_key=f"{conversation.id}:{uuid.uuid4()}",
             reporter_id=stranger.pk,
             reason_code="spam",
         )
@@ -252,7 +260,7 @@ def test_a_malformed_or_unbound_message_key_fails_closed(other_user):
 
     for target_key in (
         "not-a-composite-key",
-        f"{uuid.uuid4()}:{uuid.uuid4()}",  # a conversation nobody bound
+        f"{uuid.uuid4()}:{uuid.uuid4()}",  # a conversation chat does not have
     ):
         with pytest.raises(moderation.CannotReport):
             moderation.submit_report(
@@ -264,7 +272,7 @@ def test_a_malformed_or_unbound_message_key_fails_closed(other_user):
 
 
 def test_a_message_chat_has_no_copy_of_is_a_404_not_a_503(
-    published_listing, other_user
+    published_listing, other_user, user
 ):
     """A deleted, erased or invented message is GONE, not unavailable.
 
@@ -275,18 +283,18 @@ def test_a_message_chat_has_no_copy_of_is_a_404_not_a_503(
     """
     from stapel_moderation import services as moderation
 
-    conversation = _bind(published_listing, other_user)
+    conversation = _empty_thread(published_listing, other_user, user)
     with pytest.raises(moderation.TargetNotFound):
         moderation.submit_report(
             target_type="chat_message",
-            target_key=f"{conversation}:{uuid.uuid4()}",
+            target_key=f"{conversation.id}:{uuid.uuid4()}",
             reporter_id=other_user.pk,
             reason_code="spam",
         )
 
 
 def test_the_report_and_the_block_are_two_calls_and_neither_undoes_the_other(
-    published_listing, other_user, user, blocks_double
+    published_listing, other_user, user, block
 ):
     """A report usually accompanies a block. They stay separate acts against
     separate owners — moderation queues the complaint, profiles records the
@@ -301,7 +309,7 @@ def test_the_report_and_the_block_are_two_calls_and_neither_undoes_the_other(
         reason_code="harassment",
         description="Threats.",
     )
-    blocks_double["blocked"].add(frozenset((str(other_user.pk), str(user.pk))))
+    block(other_user, user)
 
     context = services.conversation_context(conversation.id, viewer_id=other_user.pk)
     assert context["subject"]["listing"]["title"] == "Apple iPhone 13 Pro"

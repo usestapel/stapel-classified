@@ -1,3 +1,10 @@
+#: The block harness this module SHIPS (`stapel_classified.testing`), used
+#: here rather than hand-rolled — a fixture a consumer cannot import is a
+#: fixture every consumer rewrites. Named explicitly rather than left to the
+#: pytest11 entry point, so a stale editable install cannot silently drop it.
+pytest_plugins = ("stapel_classified.testing",)
+
+
 def pytest_configure(config):
     from django.conf import settings
 
@@ -13,15 +20,27 @@ def pytest_configure(config):
         # against the real member modules, not that they parse.
         #
         # stapel_chat (+ stapel_realtime, its WebSocket substrate) is NOT a
-        # member of this composite: it owns no part of the preset, and
-        # ConversationSubject exists precisely because chat may not know what
-        # a listing is. It is mounted HERE because the `chat_message` target
-        # type now names `chat.moderation_content` as its content function,
-        # and this file's own rule is that a double on either side of a seam
-        # is the one thing that cannot prove it. Mounting chat brings its
-        # deployment checks (E010-E014) with it, which is why the realtime
-        # settings below are real — the mirror of stapel-chat's own harness,
-        # which mounts stapel_moderation for exactly this reason.
+        # member of this composite: it owns no part of the preset, and this
+        # module is not allowed to know what a message is. It is mounted HERE
+        # because the composite now READS chat — the `chat_message` target
+        # type names `chat.moderation_content`, and the conversation header is
+        # built on `chat.conversation_participants` — and this file's own rule
+        # is that a double on either side of a seam is the one thing that
+        # cannot prove it. Mounting chat brings its deployment checks
+        # (E010-E014) with it, which is why the realtime settings below are
+        # real — the mirror of stapel-chat's own harness, which mounts
+        # stapel_moderation for exactly this reason.
+        #
+        # stapel_profiles is mounted for the same reason and it is the newer
+        # one: BLOCK_ENFORCEMENT defaults to "required", so every test in this
+        # suite runs against a REGISTERED `profiles.relationships` provider or
+        # it is not running against this module's default posture at all. A
+        # fixture that registered a block double would have been a suite
+        # asserting its own idea of profiles; the block a test sets up here is
+        # a real `UserRelationship` row read by profiles' real provider. The
+        # three tests that assert the no-provider posture unregister it
+        # explicitly (`no_block_provider`) — that state is a deployment
+        # WITHOUT profiles, which is a thing to construct, not to inherit.
         from stapel_classified import preset
 
         settings.configure(
@@ -47,6 +66,10 @@ def pytest_configure(config):
                 # AppConfig.ready() — the two lines a host with chat writes.
                 "stapel_realtime",
                 "stapel_chat",
+                # Serves profiles.relationships / .display_names /
+                # .public_cards — the three reads the header and the block
+                # check make. See the note above.
+                "stapel_profiles",
                 "stapel_classified",
             ],
             AUTH_USER_MODEL="users.User",
@@ -147,6 +170,11 @@ def pytest_configure(config):
                 # retry ladder against nothing.
                 "SCREEN_ENABLED": False,
             },
+            # The preset's own chat declaration, under test: the `listing`
+            # subject type chat refuses to store without, and the "required"
+            # block posture this composite sets over chat's "auto". A harness
+            # that spelled its own would prove nothing about the preset.
+            STAPEL_CHAT=preset.SETTINGS_DEFAULTS["STAPEL_CHAT"],
             STAPEL_REVIEWS=preset.SETTINGS_DEFAULTS["STAPEL_REVIEWS"],
             STAPEL_LISTINGS={"REQUIRE_IMAGE_ON_PUBLISH": False},
         )

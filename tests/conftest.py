@@ -157,46 +157,57 @@ def cdn_double():
     return state
 
 
-@pytest.fixture
-def profiles_double():
-    """``profiles.display_names`` — the only public-profile read the fleet has."""
-    from stapel_core.comm import function
-
-    state = {"display_names": {}}
-
-    @function("profiles.display_names")
-    def _names(payload):
-        wanted = [str(u) for u in (payload.get("user_ids") or [])]
-        return {
-            "display_names": {
-                u: state["display_names"][u] for u in wanted if u in state["display_names"]
-            }
-        }
-
-    return state
+# The block fixtures (`block`, `blocks_down`, `no_block_provider`) come from
+# `stapel_classified.testing`, the plugin this module ships for every
+# deployment that installs it — see the root conftest. This suite uses the
+# shipped harness rather than a private copy, which is also how the harness
+# stays honest: it is exercised by the module's own tests.
 
 
 @pytest.fixture
-def blocks_double(settings):
-    """The routed-upstream ``profiles.relationships`` provider, in-process.
+def display_name():
+    """Give a user a display name, through stapel-profiles' own write path.
 
-    Registering it is how a test puts the composite into the state the fleet
-    will be in once stapel-profiles ships the function: blocks enforced, not
-    merely declared.
+    There is no ``profiles.display_names`` double any more, and there must not
+    be: stapel_profiles is mounted in this harness (see the root conftest), it
+    serves that Function itself, and core's registry allows exactly one
+    provider per name. A double would have been this suite asserting its own
+    idea of profiles while the real one sat next to it unused.
     """
-    from stapel_core.comm import function
+    from stapel_profiles.models import get_profile_model
 
-    state = {"blocked": set(), "fail": False}
+    def _set(user, name):
+        profile, _ = get_profile_model().objects.get_or_create(user_id=user.pk)
+        profile.display_name = name
+        profile.save(update_fields=["display_name"])
+        return profile
 
-    @function("profiles.relationships")
-    def _relationships(payload):
-        if state["fail"]:
-            raise RuntimeError("profiles is down")
-        pairs = payload.get("pairs") or []
-        return {
-            "blocked": [
-                [a, b] for a, b in pairs if frozenset((str(a), str(b))) in state["blocked"]
-            ]
-        }
+    return _set
 
-    return state
+
+# ── Real chat threads ────────────────────────────────────────────────
+
+
+@pytest.fixture
+def thread():
+    """``thread(buyer, seller, listing)`` — a real direct conversation in chat.
+
+    Created through ``stapel_chat.services.create_direct`` with the subject,
+    which is the call a client makes. Since chat 0.6.0 the subject is part of
+    a direct thread's identity, so this is also what makes two listings
+    between the same two people two different threads — the arithmetic that
+    used to force this composite to keep its own many-subjects table.
+    """
+    from stapel_chat.services import create_direct
+
+    def _make(owner, other, listing=None, *, subject_key=None, scope_key=""):
+        key = str(subject_key if subject_key is not None else listing.pk)
+        return create_direct(
+            owner=owner,
+            other_user_id=other.pk,
+            scope_key=scope_key,
+            subject_type="listing",
+            subject_key=key,
+        )
+
+    return _make

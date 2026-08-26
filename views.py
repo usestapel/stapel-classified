@@ -25,9 +25,10 @@ from .errors import (
     ERR_404_CONVERSATION_NOT_FOUND,
     ERR_404_LISTING_NOT_FOUND,
     ERR_503_BLOCKS_UNAVAILABLE,
+    ERR_503_CHAT_UNAVAILABLE,
 )
 from .serializers import (
-    ConversationBindSerializer,
+    ConversationConfirmSerializer,
     ConversationContextPageResponseSerializer,
     ConversationContextQuerySerializer,
     ConversationContextResponseSerializer,
@@ -43,8 +44,12 @@ def _maps_errors(handler):
             return handler(self, request, *args, **kwargs)
         except services.SubjectNotFound:
             return StapelErrorResponse(404, ERR_404_LISTING_NOT_FOUND)
-        except services.ConversationNotBound:
+        except (services.ConversationNotBound, services.NotAParty):
+            # The same 404 for both: a distinct answer for "that thread exists
+            # and is not yours" would confirm the id names a real thread.
             return StapelErrorResponse(404, ERR_404_CONVERSATION_NOT_FOUND)
+        except services.ChatUnavailable:
+            return StapelErrorResponse(503, ERR_503_CHAT_UNAVAILABLE)
         except services.OwnListing:
             return StapelErrorResponse(400, ERR_400_OWN_LISTING)
         except services.ContactRefused:
@@ -58,23 +63,24 @@ def _maps_errors(handler):
 
 
 @extend_schema(tags=["Classified / conversations"])
-class ConversationBindView(StapelAPIView):
-    """Record that a chat conversation is about a listing, and answer with the
-    header the client is about to render.
+class ConversationConfirmView(StapelAPIView):
+    """Confirm a contact about a listing, and answer the header to render.
 
-    Idempotent: the same (conversation, listing) pair is one fact however many
-    times a retry or a second tab reports it, and the first writer's parties
-    stand — a later caller cannot rewrite who the two sides of a thread are.
+    **200, not 201**: since 0.3.2 this creates nothing. The thread is chat's
+    and carries its own subject; what happens here is the check no other
+    module in the fleet can make — the listing exists, the caller is not its
+    seller, chat agrees the caller is in that thread and that it really is
+    about that listing, and no block stands between the two parties.
     """
 
     permission_classes = [IsNotAnonymousUser]
     stapel_anonymous_access = ANONYMOUS_DENIED
-    request_serializer_class = ConversationBindSerializer
+    request_serializer_class = ConversationConfirmSerializer
     response_serializer_class = ConversationContextResponseSerializer
 
     @extend_schema(
-        request=ConversationBindSerializer,
-        responses={201: ConversationContextResponseSerializer},
+        request=ConversationConfirmSerializer,
+        responses={200: ConversationContextResponseSerializer},
     )
     @_maps_errors
     def post(self, request):
@@ -82,18 +88,12 @@ class ConversationBindView(StapelAPIView):
         payload.is_valid(raise_exception=True)
         data = payload.validated_data
 
-        services.bind_listing_conversation(
+        context = services.confirm_listing_conversation(
             conversation_id=data["conversation_id"],
             listing_key=data["listing_id"],
             actor_id=request.user.pk,
-            scope_key=data.get("scope_key") or "",
         )
-        context = services.conversation_context(
-            data["conversation_id"], viewer_id=request.user.pk
-        )
-        return StapelResponse(
-            self.get_response_serializer_class()(context).data, status=201
-        )
+        return StapelResponse(self.get_response_serializer_class()(context).data)
 
 
 @extend_schema(tags=["Classified / conversations"])
@@ -158,7 +158,7 @@ class ConversationContextBatchView(StapelAPIView):
 
 
 __all__ = [
-    "ConversationBindView",
+    "ConversationConfirmView",
     "ConversationContextBatchView",
     "ConversationContextView",
 ]

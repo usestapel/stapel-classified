@@ -21,12 +21,20 @@ ERR_400_OWN_LISTING = "error.400.classified_own_listing"
 ERR_403_CONTACT_REFUSED = "error.403.classified_contact_refused"
 ERR_503_BLOCKS_UNAVAILABLE = "error.503.classified_blocks_unavailable"
 
+# ── The conversation itself ──────────────────────────────────────────
+#: Chat owns both halves of a conversation header's provenance (who is in the
+#: thread, what it is about) since 0.3.2, so a chat outage is a 503 here and
+#: never an empty page: an empty page reads as "you are not a party to any of
+#: these", which is a permission answer, not an outage.
+ERR_503_CHAT_UNAVAILABLE = "error.503.classified_chat_unavailable"
+
 STAPEL_CLASSIFIED_ERRORS = {
     ERR_404_LISTING_NOT_FOUND: "This listing no longer exists",
     ERR_404_CONVERSATION_NOT_FOUND: "Conversation not found",
     ERR_400_OWN_LISTING: "You cannot start a buyer conversation on your own listing",
     ERR_403_CONTACT_REFUSED: "This seller cannot be contacted",
     ERR_503_BLOCKS_UNAVAILABLE: "Contacts are temporarily unavailable, try again shortly",
+    ERR_503_CHAT_UNAVAILABLE: "Conversations are temporarily unavailable, try again shortly",
 }
 
 #: What a client can actually DO about each refusal (core's REMEDIATION_VOCAB).
@@ -36,6 +44,7 @@ STAPEL_CLASSIFIED_REMEDIATION = {
     ERR_400_OWN_LISTING: "fix_input",
     ERR_403_CONTACT_REFUSED: "contact_support",
     ERR_503_BLOCKS_UNAVAILABLE: "wait_and_retry",
+    ERR_503_CHAT_UNAVAILABLE: "wait_and_retry",
 }
 
 register_service_errors(

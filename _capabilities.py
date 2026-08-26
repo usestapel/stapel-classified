@@ -24,6 +24,9 @@ def main(argv=None):
     axes = {
         "BLOCK_ENFORCEMENT",
         "BLOCK_FUNCTION",
+        # An axis rather than tuning: it names WHO answers "is this person in
+        # that thread", which is the authorization every read here hangs off.
+        "CONVERSATION_PARTICIPANTS_FUNCTION",
         "PUBLIC_PROFILE_FUNCTION",
         "SELLER_RATING_TARGET_TYPE",
     }
@@ -38,6 +41,7 @@ def main(argv=None):
             exact={
                 "BLOCK_ENFORCEMENT": "classified.blocks",
                 "BLOCK_FUNCTION": "classified.blocks",
+                "CONVERSATION_PARTICIPANTS_FUNCTION": "classified.conversations",
                 "PUBLIC_PROFILE_FUNCTION": "classified.cards",
                 "SELLER_RATING_TARGET_TYPE": "classified.cards",
             }

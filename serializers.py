@@ -27,21 +27,20 @@ class ConversationContextPageResponseSerializer(StapelDataclassSerializer):
         dataclass = ConversationContextPageDTO
 
 
-class ConversationBindSerializer(serializers.Serializer):
-    """Bind a chat conversation to the listing it is about.
+class ConversationConfirmSerializer(serializers.Serializer):
+    """Confirm that a contact about a listing is allowed, and read its header.
 
     ``conversation_id`` comes from stapel-chat, which the client has just
-    called (``POST /chat/api/v1/conversations``). It is not created here and
-    could not be: chat 0.4.0 publishes no comm Function to create one and no
-    event when one appears — both are routed upstream, and until they land
-    the client is the only party holding both halves.
+    called (``POST /chat/api/v1/conversations`` with ``subject_type:
+    "listing"``). Both ids are VERIFIED against chat here — through 0.3.1 they
+    were recorded as the caller said them.
+
+    There is no ``scope_key``: chat stores the thread's scope and this module
+    reads it back, so a client can no longer name a scope the thread is not in.
     """
 
     conversation_id = serializers.UUIDField()
     listing_id = serializers.CharField(max_length=255)
-    scope_key = serializers.CharField(
-        required=False, allow_blank=True, default="", max_length=255
-    )
 
 
 class ConversationContextQuerySerializer(serializers.Serializer):
@@ -53,7 +52,7 @@ class ConversationContextQuerySerializer(serializers.Serializer):
 
 
 __all__ = [
-    "ConversationBindSerializer",
+    "ConversationConfirmSerializer",
     "ConversationContextPageResponseSerializer",
     "ConversationContextQuerySerializer",
     "ConversationContextResponseSerializer",

@@ -15,11 +15,12 @@ answer changes with no fork.
 
 Why a composite has a settings namespace at all
 -----------------------------------------------
-Because it now owns cross-domain JOIN state (``ConversationSubject``) and the
-reads that hang off it. A composite still writes no member-domain logic; what
-it may own is state whose schema is nothing but two members' opaque keys,
-because no member is allowed to hold that join — see MODULE.md, "What a
-composite may own".
+Because it makes the cross-domain JOIN — the conversation header no member
+can build alone — and every module it asks is named here rather than
+imported. It owns no table any more: ``ConversationSubject`` was deleted in
+0.3.2 once stapel-chat 0.6.0 grew subjects of its own, and a composite that
+kept a second copy of somebody else's fact would be the thing §7 of the v2
+verdicts forbids.
 """
 from stapel_core.conf import AppSettings
 
@@ -52,6 +53,13 @@ DEFAULTS = {
     # EITHER direction. Routed upstream to stapel-profiles (see MODULE.md,
     # "What this composite needs and nobody serves yet").
     "BLOCK_FUNCTION": "profiles.relationships",
+
+    # ── The conversation ─────────────────────────────────────────────
+    # Who is in a thread, and what it is about. stapel-chat >= 0.6.0 serves
+    # it; this is the read that replaced the composite's own binding table,
+    # and it is the one seam that has no degraded form — see
+    # services.ChatUnavailable for why an empty answer would be a lie.
+    "CONVERSATION_PARTICIPANTS_FUNCTION": "chat.conversation_participants",
 
     # ── The cards ────────────────────────────────────────────────────
     # Listing documents. `listings.search_documents` serves every status

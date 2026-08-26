@@ -8,7 +8,7 @@
     "/classified/api/v1/conversations": {
       "post": {
         "operationId": "classified_api_v1_conversations_create",
-        "description": "Record that a chat conversation is about a listing, and answer with the\nheader the client is about to render.\n\nIdempotent: the same (conversation, listing) pair is one fact however many\ntimes a retry or a second tab reports it, and the first writer's parties\nstand — a later caller cannot rewrite who the two sides of a thread are.\n\n**Permissions:** `IsNotAnonymousUser`",
+        "description": "Confirm a contact about a listing, and answer the header to render.\n\n**200, not 201**: since 0.3.2 this creates nothing. The thread is chat's\nand carries its own subject; what happens here is the check no other\nmodule in the fleet can make — the listing exists, the caller is not its\nseller, chat agrees the caller is in that thread and that it really is\nabout that listing, and no block stands between the two parties.\n\n**Permissions:** `IsNotAnonymousUser`",
         "tags": [
           "Classified / conversations"
         ],
@@ -16,17 +16,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ConversationBind"
+                "$ref": "#/components/schemas/ConversationConfirm"
               }
             },
             "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/ConversationBind"
+                "$ref": "#/components/schemas/ConversationConfirm"
               }
             },
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/ConversationBind"
+                "$ref": "#/components/schemas/ConversationConfirm"
               }
             }
           },
@@ -38,7 +38,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -201,9 +201,9 @@
           }
         }
       },
-      "ConversationBind": {
+      "ConversationConfirm": {
         "type": "object",
-        "description": "Bind a chat conversation to the listing it is about.\n\n``conversation_id`` comes from stapel-chat, which the client has just\ncalled (``POST /chat/api/v1/conversations``). It is not created here and\ncould not be: chat 0.4.0 publishes no comm Function to create one and no\nevent when one appears — both are routed upstream, and until they land\nthe client is the only party holding both halves.",
+        "description": "Confirm that a contact about a listing is allowed, and read its header.\n\n``conversation_id`` comes from stapel-chat, which the client has just\ncalled (``POST /chat/api/v1/conversations`` with ``subject_type:\n\"listing\"``). Both ids are VERIFIED against chat here — through 0.3.1 they\nwere recorded as the caller said them.\n\nThere is no ``scope_key``: chat stores the thread's scope and this module\nreads it back, so a client can no longer name a scope the thread is not in.",
         "properties": {
           "conversation_id": {
             "type": "string",
@@ -211,11 +211,6 @@
           },
           "listing_id": {
             "type": "string",
-            "maxLength": 255
-          },
-          "scope_key": {
-            "type": "string",
-            "default": "",
             "maxLength": 255
           }
         },
@@ -252,12 +247,6 @@
           },
           "viewer_role": {
             "type": "string"
-          },
-          "previous_subjects": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SubjectDTO"
-            }
           }
         }
       },
@@ -408,7 +397,7 @@
       },
       "SubjectDTO": {
         "type": "object",
-        "description": "What a conversation is about, and since when.",
+        "description": "What a conversation is about — chat's opaque pair, resolved.\n\n``meta_status`` / ``meta_reason`` carry the one thing nothing in the fleet\ncan refuse at creation time: a thread whose subject names a listing whose\nOWNER is not in it (``subject_owner_not_a_party``). Chat may not know what\na listing is, so it cannot check; this module can only check it while\nrendering. It is a badge rather than a 404 because refusing here would\nalso hide honest threads — a seller's own listing discussed in a group\nroom, a listing whose owner changed.",
         "properties": {
           "type": {
             "type": "string"
@@ -424,7 +413,10 @@
             ],
             "nullable": true
           },
-          "bound_at": {
+          "meta_status": {
+            "type": "string"
+          },
+          "meta_reason": {
             "type": "string",
             "nullable": true
           }

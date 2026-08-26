@@ -3,16 +3,20 @@
 The owner opened the live product's chat and found it "unclear with whom and
 about what" — no short listing card, no seller data. Every test here is a
 sentence from that finding, run against REAL member modules: a real listing
-moved through its real publication pipeline, the real
-``listings.search_documents`` behind the card, the real CDN contract shape.
-A mock on either side of a seam is exactly what cannot prove a seam.
+moved through its real publication pipeline, a real stapel-chat thread carrying
+a real subject, the real ``listings.search_documents`` behind the card, the
+real profiles behind the person. A mock on either side of a seam is exactly
+what cannot prove a seam.
+
+Since 0.3.2 the subject and the parties are read from chat rather than from a
+table this package kept, so the threads below are created by calling chat the
+way a client does.
 """
 import uuid
 
 import pytest
 
 from stapel_classified import services
-from stapel_classified.models import ConversationSubject
 
 pytestmark = pytest.mark.django_db
 
@@ -21,67 +25,118 @@ def _conv():
     return uuid.uuid4()
 
 
-def _bind(listing, buyer, conversation=None):
-    conversation = conversation or _conv()
-    services.bind_listing_conversation(
-        conversation_id=conversation,
+def _confirm(conversation, listing, buyer):
+    return services.confirm_listing_conversation(
+        conversation_id=conversation.id,
         listing_key=listing.pk,
         actor_id=buyer.pk,
     )
-    return conversation
 
 
-# ── Binding ──────────────────────────────────────────────────────────
+def _publish(listing):
+    from stapel_listings.services.publish import publish_listing
+
+    publish_listing(listing)
+    listing.apply_moderation("approved")
+    listing.refresh_from_db()
+    return listing
 
 
-def test_a_conversation_carries_a_resolvable_listing(published_listing, other_user):
-    conversation = _bind(published_listing, other_user)
-
-    row = ConversationSubject.objects.get(conversation_id=conversation)
-    assert row.subject_type == "listing"
-    assert row.subject_key == str(published_listing.pk)
-    assert str(row.initiator_id) == str(other_user.pk)
-    assert str(row.counterparty_id) == str(published_listing.owner_id)
+# ── Confirming a contact ─────────────────────────────────────────────
 
 
-def test_binding_is_idempotent_and_the_first_writer_owns_the_parties(
-    published_listing, other_user, user
+def test_a_conversation_carries_a_resolvable_listing(
+    published_listing, other_user, user, thread
 ):
-    """A retry, a second tab, an at-least-once client: one fact either way —
-    and a later caller cannot rewrite who the two sides of a thread are."""
-    conversation = _bind(published_listing, other_user)
-    services.bind_listing_conversation(
-        conversation_id=conversation,
-        listing_key=published_listing.pk,
-        actor_id=other_user.pk,
-    )
-    assert ConversationSubject.objects.filter(conversation_id=conversation).count() == 1
+    context = _confirm(thread(other_user, user, published_listing), published_listing, other_user)
+
+    assert context["subject"]["type"] == "listing"
+    assert context["subject"]["key"] == str(published_listing.pk)
+    assert context["subject"]["meta_status"] == "ok"
+    assert context["counterparty"]["user_id"] == str(published_listing.owner_id)
+
+
+def test_confirming_twice_is_the_same_answer_and_creates_nothing(
+    published_listing, other_user, user, thread
+):
+    """A retry, a second tab, an at-least-once client: one answer either way.
+
+    Idempotence used to be a database constraint here (one row per
+    conversation+subject, first writer wins). It is now a property of the call
+    having no side effect at all — the thread is chat's and this only reads it.
+    """
+    conversation = thread(other_user, user, published_listing)
+    first = _confirm(conversation, published_listing, other_user)
+    second = _confirm(conversation, published_listing, other_user)
+    assert first == second
 
 
 def test_you_cannot_open_a_buyer_conversation_on_your_own_listing(
-    published_listing, user
+    published_listing, user, other_user, thread
 ):
     with pytest.raises(services.OwnListing):
-        _bind(published_listing, user)
+        _confirm(thread(user, other_user, published_listing), published_listing, user)
 
 
-def test_binding_to_a_listing_nobody_serves_is_refused(other_user):
+def test_a_contact_about_a_listing_nobody_serves_is_refused(other_user, user, thread):
     with pytest.raises(services.SubjectNotFound):
-        services.bind_listing_conversation(
+        services.confirm_listing_conversation(
             conversation_id=_conv(), listing_key="999999", actor_id=other_user.pk
         )
+
+
+def test_a_conversation_chat_does_not_have_is_refused(
+    published_listing, other_user
+):
+    with pytest.raises(services.ConversationNotBound):
+        services.confirm_listing_conversation(
+            conversation_id=_conv(),
+            listing_key=published_listing.pk,
+            actor_id=other_user.pk,
+        )
+
+
+def test_a_thread_about_another_listing_is_not_this_contact(
+    make_listing, published_listing, other_user, user, thread
+):
+    """The claim that 0.3.x could not check, now checked.
+
+    Until 0.3.2 the caller TOLD this module which listing a thread was about
+    and the module wrote it down. Chat stores the subject now, so a request
+    naming a different listing than the thread carries is a 404 rather than a
+    relabelling of somebody's conversation.
+    """
+    other = _publish(make_listing(title_draft="Sony WH-1000XM4"))
+    conversation = thread(other_user, user, published_listing)
+
+    with pytest.raises(services.ConversationNotBound):
+        _confirm(conversation, other, other_user)
+
+
+def test_an_outsider_cannot_confirm_a_thread_they_are_not_in(
+    published_listing, other_user, user, thread, db
+):
+    from django.contrib.auth import get_user_model
+
+    stranger = get_user_model().objects.create(
+        username="mallory0", email="mallory0@example.com"
+    )
+    conversation = thread(other_user, user, published_listing)
+
+    with pytest.raises(services.NotAParty):
+        _confirm(conversation, published_listing, stranger)
 
 
 # ── The card ─────────────────────────────────────────────────────────
 
 
 def test_the_header_carries_a_short_card_and_the_seller(
-    published_listing, other_user, profiles_double
+    published_listing, other_user, user, thread, display_name
 ):
-    profiles_double["display_names"][str(published_listing.owner_id)] = "Ada Lovelace"
-    conversation = _bind(published_listing, other_user)
+    display_name(user, "Ada Lovelace")
+    conversation = thread(other_user, user, published_listing)
 
-    context = services.conversation_context(conversation, viewer_id=other_user.pk)
+    context = services.conversation_context(conversation.id, viewer_id=other_user.pk)
     card = context["subject"]["listing"]
     assert card["title"] == "Apple iPhone 13 Pro"
     assert card["currency"] == "USD"
@@ -96,31 +151,31 @@ def test_the_header_carries_a_short_card_and_the_seller(
 
 
 def test_the_seller_sees_the_buyer_as_the_counterparty(
-    published_listing, other_user, user, profiles_double
+    published_listing, other_user, user, thread, display_name
 ):
-    """One row, two readings. The card a seller opens must not show the
+    """One thread, two readings. The header a seller opens must not show the
     seller — the counterparty is whoever the reader is not."""
-    profiles_double["display_names"][str(other_user.pk)] = "Grace Hopper"
-    conversation = _bind(published_listing, other_user)
+    display_name(other_user, "Grace Hopper")
+    conversation = thread(other_user, user, published_listing)
 
-    context = services.conversation_context(conversation, viewer_id=user.pk)
+    context = services.conversation_context(conversation.id, viewer_id=user.pk)
     assert context["counterparty"]["user_id"] == str(other_user.pk)
     assert context["counterparty"]["display_name"] == "Grace Hopper"
     assert context["viewer_role"] == "seller"
 
 
-def test_a_sold_listing_still_has_a_header(published_listing, other_user):
+def test_a_sold_listing_still_has_a_header(published_listing, other_user, user, thread):
     """The moment a buyer is MOST confused is the one a public read hides.
 
     ``Listing.visible_to`` 404s anything not published — correct for a
     stranger, useless for the person standing in the conversation about it.
     The card answers ``unavailable`` with the real status instead.
     """
-    conversation = _bind(published_listing, other_user)
+    conversation = thread(other_user, user, published_listing)
     published_listing.status = "sold"
     published_listing.save(update_fields=["status"])
 
-    card = services.conversation_context(conversation, viewer_id=other_user.pk)[
+    card = services.conversation_context(conversation.id, viewer_id=other_user.pk)[
         "subject"
     ]["listing"]
     assert card["state"] == "unavailable"
@@ -129,30 +184,53 @@ def test_a_sold_listing_still_has_a_header(published_listing, other_user):
 
 
 def test_a_deleted_listing_answers_gone_rather_than_vanishing(
-    published_listing, other_user
+    published_listing, other_user, user, thread
 ):
-    conversation = _bind(published_listing, other_user)
+    conversation = thread(other_user, user, published_listing)
     published_listing.delete()  # soft delete — the row keeps existing
 
-    card = services.conversation_context(conversation, viewer_id=other_user.pk)[
-        "subject"
-    ]["listing"]
+    context = services.conversation_context(conversation.id, viewer_id=other_user.pk)
+    card = context["subject"]["listing"]
     assert card["state"] == "gone"
     assert card["meta_reason"] == "listing_deleted"
     # And the conversation itself is still readable: blocking a thread's
     # header on a deleted listing would delete the conversation from the UI.
     assert card["listing_id"] == str(published_listing.pk)
+    # A gone listing has no owner to be a party — the card already says so,
+    # and the subject must not ALSO cry "owner not a party" about it.
+    assert context["subject"]["meta_status"] == "ok"
+
+
+def test_a_thread_whose_subject_belongs_to_neither_party_says_so(
+    make_listing, other_user, user, thread, db
+):
+    """The one hole nothing in the fleet can close at creation time.
+
+    Chat may not know what a listing is, so it cannot refuse a thread whose
+    subject names a listing belonging to a third party. This module can only
+    notice while rendering — so it renders, and says the header is degraded
+    rather than showing a stranger's listing as if it were this contact's.
+    """
+    from django.contrib.auth import get_user_model
+
+    outsider = get_user_model().objects.create(
+        username="third", email="third@example.com"
+    )
+    listing = _publish(make_listing())  # owned by `user`
+    conversation = thread(other_user, outsider, listing)
+
+    context = services.conversation_context(conversation.id, viewer_id=other_user.pk)
+    assert context["subject"]["meta_status"] == "partial"
+    assert context["subject"]["meta_reason"] == "subject_owner_not_a_party"
+    # It still renders: the card, and the person actually in the thread.
+    assert context["subject"]["listing"]["title"] == "Apple iPhone 13 Pro"
+    assert context["counterparty"]["user_id"] == str(outsider.pk)
 
 
 def test_the_primary_image_carries_cdn_render_metadata(
-    make_listing, other_user, cdn_double
+    make_listing, other_user, user, thread, cdn_double
 ):
-    from stapel_listings.services.publish import publish_listing
-
-    listing = make_listing(images_draft=["product/abc"])
-    publish_listing(listing)
-    listing.apply_moderation("approved")
-    listing.refresh_from_db()
+    listing = _publish(make_listing(images_draft=["product/abc"]))
 
     cdn_double["items"]["product/abc"] = {
         "mime": "image/webp",
@@ -164,9 +242,9 @@ def test_the_primary_image_carries_cdn_render_metadata(
         "variants": [{"tier": 240, "branch": "w", "url": "u", "width": 240, "height": 160}],
         "meta_status": "ok",
     }
-    conversation = _bind(listing, other_user)
+    conversation = thread(other_user, user, listing)
 
-    image = services.conversation_context(conversation, viewer_id=other_user.pk)[
+    image = services.conversation_context(conversation.id, viewer_id=other_user.pk)[
         "subject"
     ]["listing"]["image"]
     assert image["ref"] == "product/abc"
@@ -176,18 +254,13 @@ def test_the_primary_image_carries_cdn_render_metadata(
 
 
 def test_an_unreachable_cdn_degrades_the_card_and_never_the_conversation(
-    make_listing, other_user
+    make_listing, other_user, user, thread
 ):
     """Degradation is data. No cdn provider is registered in this test."""
-    from stapel_listings.services.publish import publish_listing
+    listing = _publish(make_listing(images_draft=["product/abc"]))
+    conversation = thread(other_user, user, listing)
 
-    listing = make_listing(images_draft=["product/abc"])
-    publish_listing(listing)
-    listing.apply_moderation("approved")
-    listing.refresh_from_db()
-    conversation = _bind(listing, other_user)
-
-    card = services.conversation_context(conversation, viewer_id=other_user.pk)[
+    card = services.conversation_context(conversation.id, viewer_id=other_user.pk)[
         "subject"
     ]["listing"]
     assert card["meta_status"] == "partial"
@@ -196,21 +269,28 @@ def test_an_unreachable_cdn_degrades_the_card_and_never_the_conversation(
     assert card["title"] == "Apple iPhone 13 Pro"
 
 
-def test_a_missing_public_profile_is_named_not_blank(published_listing, other_user):
-    """No profiles provider at all: the card says WHICH function it wanted."""
-    conversation = _bind(published_listing, other_user)
+def test_a_person_who_has_typed_no_name_is_still_a_person(
+    published_listing, other_user, user, thread
+):
+    """profiles is mounted and answers; the seller simply has no display name.
 
-    seller = services.conversation_context(conversation, viewer_id=other_user.pk)[
+    Not `partial`: the card is complete, it is the person who is blank. A
+    frontend renders initials — the contract says so — and nothing here
+    invents a placeholder name.
+    """
+    conversation = thread(other_user, user, published_listing)
+
+    seller = services.conversation_context(conversation.id, viewer_id=other_user.pk)[
         "counterparty"
     ]
-    assert seller["meta_status"] == "partial"
-    assert seller["meta_reason"] == "profile_unavailable"
+    assert seller["user_id"] == str(user.pk)
+    assert seller["display_name"] == ""
     assert seller["avatar"] is None
     assert seller["rating"] is None  # never a fabricated zero
 
 
 def test_a_rating_appears_once_seller_reviews_are_wired(
-    published_listing, other_user, user, settings
+    published_listing, other_user, user, thread, settings
 ):
     """Against the REAL stapel-reviews aggregate, not a double.
 
@@ -229,89 +309,143 @@ def test_a_rating_appears_once_seller_reviews_are_wired(
         target_type="seller", target_key=str(user.pk), author=user, rating=4
     )
 
-    conversation = _bind(published_listing, other_user)
-    seller = services.conversation_context(conversation, viewer_id=other_user.pk)[
+    conversation = thread(other_user, user, published_listing)
+    seller = services.conversation_context(conversation.id, viewer_id=other_user.pk)[
         "counterparty"
     ]
     assert seller["rating"]["count"] == 2
     assert float(seller["rating"]["avg"]) == 4.5
 
 
-# ── Several subjects in one thread ───────────────────────────────────
+# ── One thread per listing, which is the whole point of 0.3.2 ────────
 
 
-def test_one_thread_can_be_about_two_listings(make_listing, other_user):
-    """chat 0.4.0's own arithmetic: a direct thread is keyed by the PAIR, so
-    one buyer and one seller have exactly one thread whatever they discuss.
-    Refusing the second listing would render the wrong card — the defect this
-    work exists to fix — so the newest is the header and the rest is history.
+def test_two_listings_between_the_same_two_people_are_two_threads(
+    make_listing, other_user, user, thread
+):
+    """The arithmetic that used to force a many-subjects table, inverted.
+
+    Through chat 0.5.x a direct thread was keyed by the participant PAIR, so
+    one buyer and one seller had exactly ONE thread whatever they discussed;
+    this composite kept every binding and rendered the newest, with the rest
+    as `previous_subjects`. chat 0.6.0 put the subject into `direct_key`, so
+    the second listing is its own thread with its own header — and
+    `previous_subjects` is gone rather than always empty.
     """
-    from stapel_listings.services.publish import publish_listing
+    first = _publish(make_listing())
+    second = _publish(make_listing(title_draft="Sony WH-1000XM4"))
 
-    first = make_listing()
-    second = make_listing(title_draft="Sony WH-1000XM4")
-    for listing in (first, second):
-        publish_listing(listing)
-        listing.apply_moderation("approved")
-        listing.refresh_from_db()
+    one = thread(other_user, user, first)
+    two = thread(other_user, user, second)
+    assert one.id != two.id
 
-    conversation = _conv()
-    _bind(first, other_user, conversation)
-    _bind(second, other_user, conversation)
+    contexts = services.conversation_contexts(
+        [str(one.id), str(two.id)], viewer_id=other_user.pk
+    )
+    assert {c["subject"]["listing"]["title"] for c in contexts.values()} == {
+        "Apple iPhone 13 Pro",
+        "Sony WH-1000XM4",
+    }
+    assert "previous_subjects" not in contexts[str(one.id)]
 
-    context = services.conversation_context(conversation, viewer_id=other_user.pk)
-    assert context["subject"]["listing"]["title"] == "Sony WH-1000XM4"
-    assert len(context["previous_subjects"]) == 1
-    assert context["previous_subjects"][0]["listing"]["title"] == "Apple iPhone 13 Pro"
+
+def test_a_thread_about_nothing_in_particular_has_no_classified_header(
+    other_user, user, db
+):
+    """chat's own category, not an error.
+
+    Every conversation created before chat 0.6.0 is one of these, and a
+    generic chat opens them forever. This composite has nothing to say about
+    them, so they are absent from its answer rather than rendered blank.
+    """
+    from stapel_chat.services import create_direct
+
+    conversation = create_direct(owner=other_user, other_user_id=user.pk)
+
+    assert services.conversation_contexts(
+        [str(conversation.id)], viewer_id=other_user.pk
+    ) == {}
+    with pytest.raises(services.ConversationNotBound):
+        services.conversation_context(conversation.id, viewer_id=other_user.pk)
 
 
 # ── Reading rights ───────────────────────────────────────────────────
 
 
 def test_a_stranger_cannot_read_a_conversation_header(
-    published_listing, other_user, db
+    published_listing, other_user, user, thread, db
 ):
     from django.contrib.auth import get_user_model
 
     stranger = get_user_model().objects.create(
         username="mallory", email="mallory@example.com"
     )
-    conversation = _bind(published_listing, other_user)
+    conversation = thread(other_user, user, published_listing)
 
     with pytest.raises(services.ConversationNotBound):
-        services.conversation_context(conversation, viewer_id=stranger.pk)
+        services.conversation_context(conversation.id, viewer_id=stranger.pk)
 
 
-def test_an_unbound_conversation_is_a_404(other_user):
+def test_a_conversation_nobody_has_is_a_404(other_user):
     with pytest.raises(services.ConversationNotBound):
         services.conversation_context(_conv(), viewer_id=other_user.pk)
+
+
+# ── When chat itself cannot be asked ─────────────────────────────────
+
+
+def test_an_unreachable_chat_is_a_503_and_never_an_empty_inbox(
+    other_user, settings
+):
+    """The one seam here with no degraded form.
+
+    An empty page would be indistinguishable from "you are not a party to any
+    of these" — a permission answer. A reader would take a chat outage for a
+    boundary, which is the silent-degradation shape this fleet keeps paying
+    for.
+    """
+    settings.STAPEL_CLASSIFIED = {
+        "CONVERSATION_PARTICIPANTS_FUNCTION": "chat.nobody_serves_this"
+    }
+    with pytest.raises(services.ChatUnavailable):
+        services.conversation_contexts([str(_conv())], viewer_id=other_user.pk)
+
+
+def test_the_api_turns_an_unreachable_chat_into_a_503(
+    other_user, client_for, settings
+):
+    settings.STAPEL_CLASSIFIED = {
+        "CONVERSATION_PARTICIPANTS_FUNCTION": "chat.nobody_serves_this"
+    }
+    response = client_for(other_user).post(
+        "/classified/api/v1/conversations/contexts",
+        {"conversation_ids": [str(_conv())]},
+        format="json",
+    )
+    assert response.status_code == 503
+    assert response.data["localizable_error"] == "error.503.classified_chat_unavailable"
 
 
 # ── The batch read the inbox makes ───────────────────────────────────
 
 
 def test_the_inbox_resolves_a_page_in_one_pass(
-    make_listing, other_user, profiles_double
+    make_listing, other_user, user, thread
 ):
-    from stapel_listings.services.publish import publish_listing
-
     conversations = []
     for index in range(3):
-        listing = make_listing(title_draft=f"Item {index}")
-        publish_listing(listing)
-        listing.apply_moderation("approved")
-        listing.refresh_from_db()
-        conversations.append(_bind(listing, other_user))
+        listing = _publish(make_listing(title_draft=f"Item {index}"))
+        conversations.append(thread(other_user, user, listing))
 
     contexts = services.conversation_contexts(
-        [str(c) for c in conversations] + [str(_conv())], viewer_id=other_user.pk
+        [str(c.id) for c in conversations] + [str(_conv())], viewer_id=other_user.pk
     )
     assert len(contexts) == 3
     titles = {c["subject"]["listing"]["title"] for c in contexts.values()}
     assert titles == {"Item 0", "Item 1", "Item 2"}
 
 
-def test_the_batch_is_bounded(make_listing, other_user, settings):
+def test_the_batch_is_bounded(other_user, settings):
     settings.STAPEL_CLASSIFIED = {"CONTEXT_BATCH_LIMIT": 2}
     assert services.conversation_contexts(
         [str(_conv()) for _ in range(50)], viewer_id=other_user.pk
@@ -321,18 +455,19 @@ def test_the_batch_is_bounded(make_listing, other_user, settings):
 # ── The HTTP surface ─────────────────────────────────────────────────
 
 
-def test_the_api_binds_and_answers_the_header(
-    published_listing, other_user, client_for, profiles_double
+def test_the_api_confirms_and_answers_the_header(
+    published_listing, other_user, user, thread, client_for, display_name
 ):
-    profiles_double["display_names"][str(published_listing.owner_id)] = "Ada"
-    conversation = str(_conv())
+    display_name(user, "Ada")
+    conversation = str(thread(other_user, user, published_listing).id)
 
     response = client_for(other_user).post(
         "/classified/api/v1/conversations",
         {"conversation_id": conversation, "listing_id": str(published_listing.pk)},
         format="json",
     )
-    assert response.status_code == 201, response.data
+    # 200, not 201: nothing is created here any more.
+    assert response.status_code == 200, response.data
     assert response.data["subject"]["listing"]["title"] == "Apple iPhone 13 Pro"
     assert response.data["counterparty"]["display_name"] == "Ada"
 
@@ -360,7 +495,7 @@ def test_the_api_refuses_an_anonymous_caller(published_listing, client_for):
 
 
 def test_a_stranger_gets_the_same_404_as_a_nonexistent_thread(
-    published_listing, other_user, client_for, db
+    published_listing, other_user, user, thread, client_for, db
 ):
     """Not a 403: a 403 confirms the id names a real thread, and the id is
     the only thing keeping a stranger's conversation unprobed."""
@@ -369,7 +504,7 @@ def test_a_stranger_gets_the_same_404_as_a_nonexistent_thread(
     stranger = get_user_model().objects.create(
         username="mallory2", email="mallory2@example.com"
     )
-    conversation = _bind(published_listing, other_user)
+    conversation = thread(other_user, user, published_listing).id
 
     mine = client_for(stranger).get(f"/classified/api/v1/conversations/{conversation}")
     nothing = client_for(stranger).get(f"/classified/api/v1/conversations/{_conv()}")

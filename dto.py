@@ -89,12 +89,22 @@ class SellerCardDTO:
 
 @dataclass
 class SubjectDTO:
-    """What a conversation is about, and since when."""
+    """What a conversation is about — chat's opaque pair, resolved.
+
+    ``meta_status`` / ``meta_reason`` carry the one thing nothing in the fleet
+    can refuse at creation time: a thread whose subject names a listing whose
+    OWNER is not in it (``subject_owner_not_a_party``). Chat may not know what
+    a listing is, so it cannot check; this module can only check it while
+    rendering. It is a badge rather than a 404 because refusing here would
+    also hide honest threads — a seller's own listing discussed in a group
+    room, a listing whose owner changed.
+    """
 
     type: str = "listing"
     key: str = ""
     listing: Optional[ListingCardDTO] = None
-    bound_at: Optional[str] = None
+    meta_status: str = "ok"
+    meta_reason: Optional[str] = None
 
 
 @dataclass
@@ -106,7 +116,6 @@ class ConversationContextDTO:
     subject: Optional[SubjectDTO] = None
     counterparty: Optional[SellerCardDTO] = None
     viewer_role: str = ""
-    previous_subjects: List[SubjectDTO] = field(default_factory=list)
 
 
 @dataclass

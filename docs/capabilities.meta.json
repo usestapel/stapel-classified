@@ -1,6 +1,6 @@
 {
-  "_comment": "Hand-curated layer of docs/capabilities.json (capability-config.md §2 p.3). The emitter (stapel_classified/_capabilities.py) merges this over the derived axes; an axis in conf.py DEFAULTS missing here (or vice versa) is a loud emission error. Until 0.2.0 this file said the composite had no surface at all, which was true of a package that served no HTTP and owned no state. It now owns one cross-domain JOIN (conversation <-> listing) and the reads off it, so the surface is real and stated. The AXES are the settings that change what the product does to people: whether a block is enforced at all, and which providers answer the questions a conversation header asks. Batch limits, timeouts and image tiers are tuning and deliberately not axes. Deliberately NOT rooted in surface_roots: functions.py (comm surface, reached by name over the bus, never imported), checks.py (Django check callbacks), search_sources.py (resolved by dotted path out of STAPEL_SEARCH['SOURCES'], never called directly), preset.py (plain data a settings module copies).",
-  "provides": "Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies and the marketplace reason taxonomy. Since 0.2.0 it also owns the one kind of state a composite may hold: the JOIN between a chat conversation and the listing it is about, because stapel-chat may not know what a listing is and stapel-listings may not know what a conversation is. Off that join it serves a conversation HEADER — the short listing card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone`, which is exactly the answer a public read cannot give) plus the counterparty's public seller card — and it enforces a user-to-user block at the one place a classified conversation begins, announcing at every boot whether that enforcement is live in this deployment.",
+  "_comment": "Hand-curated layer of docs/capabilities.json (capability-config.md §2 p.3). The emitter (stapel_classified/_capabilities.py) merges this over the derived axes; an axis in conf.py DEFAULTS missing here (or vice versa) is a loud emission error. Until 0.2.0 this file said the composite had no surface at all, which was true of a package that served no HTTP and owned no state. It served HTTP and owned one table from 0.2.0 to 0.3.1; since 0.3.2 the table is gone (stapel-chat 0.6.0 owns a conversation's subject) and the surface is a pure READ that joins three modules' answers into one header. The AXES are the settings that change what the product does to people: whether a block is enforced at all, and which providers answer the questions a conversation header asks. Batch limits, timeouts and image tiers are tuning and deliberately not axes. Deliberately NOT rooted in surface_roots: functions.py (comm surface, reached by name over the bus, never imported), checks.py (Django check callbacks), search_sources.py (resolved by dotted path out of STAPEL_SEARCH['SOURCES'], never called directly), preset.py (plain data a settings module copies).",
+  "provides": "Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies, the marketplace reason taxonomy, and (since 0.3.2) the `listing` subject type stapel-chat's registry ships empty of. Its own HTTP surface is a conversation HEADER, assembled from three modules that may not know about each other: chat says who is in the thread and what it is about, listings answers the short card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone` — exactly the answer a public read cannot give), profiles answers the counterparty. It owns NO table: the binding it kept from 0.2.0 to 0.3.1 existed only because chat could not tell two threads about two listings apart, and it was deleted rather than kept in sync the release chat could. It enforces a user-to-user block at the one place a classified contact begins, announcing at every boot whether that enforcement is live in this deployment.",
   "requires": [
     {
       "module": "stapel-categories",
@@ -45,7 +45,7 @@
     {
       "module": "stapel-chat",
       "optional": false,
-      "reason": "pinned (>=0.5) but not a member and never imported: the conversation ids this composite binds subjects to are chat's, and the `chat_message` moderation target names `chat.moderation_content`, which arrived in chat 0.5.0. Where no process serves that read, every complaint about a message answers 503 and moderation.W006 says so at boot"
+      "reason": "pinned (>=0.6) but not a member and never imported — it is ASKED, by name. Since 0.3.2 chat is the source of both halves of a conversation header: `chat.conversation_participants` answers who is in a thread and what it is about (0.6.0), and `chat.moderation_content` serves a reported message (0.5.0). Where no process serves those reads, a header answers 503 rather than an empty page and a complaint about a message answers 503 rather than a reporter's word for it"
     },
     {
       "module": "stapel-cdn",
@@ -55,7 +55,7 @@
     {
       "module": "stapel-profiles",
       "optional": true,
-      "reason": "reached by name for the counterparty card (`profiles.display_names`) and for block enforcement (`profiles.relationships`, which profiles does not publish yet). Absent, the seller card is `partial` and `manage.py check` prints classified.W001 saying blocks are not enforced here"
+      "reason": "reached by name for the counterparty card (`profiles.display_names`, `profiles.public_cards`) and for block enforcement (`profiles.relationships`, served since profiles 0.16.0). Absent, the seller card is `partial` — and because BLOCK_ENFORCEMENT defaults to `required`, a deployment without it must say so with `auto` or fail its own boot check (classified.E002)"
     }
   ],
   "extension_points": [
@@ -78,7 +78,7 @@
   "axes": {
     "BLOCK_ENFORCEMENT": {
       "business_label": "Is a block actually enforced",
-      "summary": "Auto: enforced wherever a block provider answers, and where none is registered the deployment is told at every boot that blocks are not enforced here — the state the fleet is in today, printed rather than assumed. 'required' turns a missing provider into a boot error and is the posture for a deployment that runs a profile service; 'off' is a disclosed statement. In every state a provider that is present and FAILS answers 503, never 'allowed': an outage is not consent."
+      "summary": "Default `required` since 0.3.1: stapel-profiles 0.16.0 serves the block check, so a deployment without a block provider must SAY so rather than inherit a silent one — a missing provider is a boot error (E002). `auto` is that knowing statement: enforced wherever a provider answers, and where none is registered the deployment is told at every boot (W001). `off` is a disclosed statement (W002). In every state a provider that is present and FAILS answers 503, never 'allowed': an outage is not consent. The composite's preset sets the same `required` on stapel-chat, whose own default is `auto` because a generic chat may ship without profiles."
     },
     "BLOCK_FUNCTION": {
       "business_label": "Where a block is looked up",
@@ -86,11 +86,15 @@
     },
     "PUBLIC_PROFILE_FUNCTION": {
       "business_label": "How much of a seller the card can show",
-      "summary": "Empty by default because no such function exists in the fleet yet: the counterparty card then carries the display name and the rating and says, in the payload, that the avatar and member-since are missing and why. Naming a function that nobody serves would be a declared-and-unconnected dependency, which is the defect class this fleet gates against."
+      "summary": "`profiles.public_cards`, served since stapel-profiles 0.16.0 — the avatar as the fleet image object, member-since, seller type. A deployment without profiles sets it empty and the counterparty card answers `partial` naming what is missing, rather than leaving a blank a client has to guess about."
     },
     "SELLER_RATING_TARGET_TYPE": {
       "business_label": "Whether sellers carry a rating",
       "summary": "Empty in the shipped scenario, because this composite registers reviews about listings rather than about people. A deployment that adds a seller review target names it here and the stars appear in every conversation header — with no release. Empty means the card says 'no rating', never a fabricated zero."
+    },
+    "CONVERSATION_PARTICIPANTS_FUNCTION": {
+      "business_label": "Who is in a conversation, and what it is about",
+      "summary": "The read that replaced this composite's own binding table in 0.3.2 (`chat.conversation_participants`, stapel-chat 0.6.0). It is the one seam here with no degraded form: an unreachable chat answers 503, because an empty page would be indistinguishable from 'you are not a party to any of these' and a reader would take an outage for a permission boundary."
     }
   },
   "surface_roots": [
@@ -108,11 +112,27 @@
     }
   ],
   "surface": {
-    "bind_listing_conversation": {
-      "kind": "factory",
-      "intent": "Record that a chat conversation is about a listing — the 'write to the seller' moment. Resolves the seller, refuses self-contact, enforces the block, and is idempotent per (conversation, listing).",
+    "blocked_pairs": {
+      "kind": "gate_function",
+      "intent": "The batch form: which of these pairs are blocked, in one call.",
       "instead_of": [
-        "storing a listing_id on your own chat model"
+        "calling is_blocked in a loop"
+      ]
+    },
+    "chat_threads": {
+      "kind": "factory",
+      "intent": "Ask chat who is in these conversations and what each is about, batched — the read that makes a second copy of chat's membership unnecessary. Raises rather than answering empty when chat cannot be reached.",
+      "instead_of": [
+        "keeping your own copy of a conversation's participants",
+        "importing stapel_chat models from a composite"
+      ]
+    },
+    "confirm_listing_conversation": {
+      "kind": "gate_function",
+      "intent": "The 'write to the seller' moment, verified: the listing exists, the caller is not its seller, chat agrees the caller is in that thread and that it really is about that listing, and no block stands between the two. Answers the header the client is about to render, and records nothing.",
+      "instead_of": [
+        "storing a listing_id on your own chat model",
+        "trusting the client's word for what a thread is about"
       ]
     },
     "conversation_context": {
@@ -129,11 +149,12 @@
         "looping conversation_context over a conversation list"
       ]
     },
-    "current_subject": {
-      "kind": "factory",
-      "intent": "The newest subject recorded for a conversation — the header's listing, when a thread has carried more than one.",
+    "is_blocked": {
+      "kind": "gate_function",
+      "intent": "Whether a block stands between two users, in either direction, under this deployment's declared enforcement posture. Raises rather than answering False when a configured provider fails.",
       "instead_of": [
-        "ConversationSubject.objects.filter(...).first()"
+        "querying a relationship table",
+        "hiding the button in the UI"
       ]
     },
     "listing_cards": {
@@ -143,26 +164,11 @@
         "calling listings.search_documents and formatting a card yourself"
       ]
     },
-    "seller_cards": {
+    "party_ids": {
       "kind": "factory",
-      "intent": "Keyed batch of PUBLIC seller cards — never more of a person than their public profile, whatever the caller holds.",
+      "intent": "The user ids in one thread answer from chat_threads, as strings — the shape every authorization check here compares against.",
       "instead_of": [
-        "reading a Profile row or a User row for a chat header"
-      ]
-    },
-    "is_blocked": {
-      "kind": "gate_function",
-      "intent": "Whether a block stands between two users, in either direction, under this deployment's declared enforcement posture. Raises rather than answering False when a configured provider fails.",
-      "instead_of": [
-        "querying a relationship table",
-        "hiding the button in the UI"
-      ]
-    },
-    "blocked_pairs": {
-      "kind": "gate_function",
-      "intent": "The batch form: which of these pairs are blocked, in one call.",
-      "instead_of": [
-        "calling is_blocked in a loop"
+        "reaching into the raw participants list in each caller"
       ]
     },
     "provider_unreachable_reason": {
@@ -170,6 +176,13 @@
       "intent": "Why the configured block provider cannot be called here, or an empty string — what the boot check prints and what tells the difference between 'no blocks in this deployment' and 'the block store is down'.",
       "instead_of": [
         "assuming a comm function is reachable"
+      ]
+    },
+    "seller_cards": {
+      "kind": "factory",
+      "intent": "Keyed batch of PUBLIC seller cards — never more of a person than their public profile, whatever the caller holds.",
+      "instead_of": [
+        "reading a Profile row or a User row for a chat header"
       ]
     }
   }

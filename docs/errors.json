@@ -396,6 +396,14 @@
     "owner": "stapel_classified"
   },
   {
+    "code": "error.503.classified_chat_unavailable",
+    "status": 503,
+    "params": [],
+    "remediation": "wait_and_retry",
+    "en": "Conversations are temporarily unavailable, try again shortly",
+    "owner": "stapel_classified"
+  },
+  {
     "code": "error.503.mandate_unavailable",
     "status": 503,
     "params": [],

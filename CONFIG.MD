@@ -9,17 +9,20 @@ automatically).
 Scenario defaults live in `stapel_classified.preset.SETTINGS_DEFAULTS` — they are
 settings-dict PRESETS for member keys, not new keys.
 
-Since 0.2.0 the composite has a namespace of its OWN, because it owns one
-cross-domain JOIN (a chat conversation ↔ the listing it is about) and the
-reads off it. Every key in it is either an axis or a comm Function NAME:
-point one at your own provider and the answer changes with no fork.
+The composite has a namespace of its OWN because it MAKES one cross-domain
+join (a chat conversation ↔ the listing it is about ↔ the person on the other
+side) at read time. It stores none of it: the table it kept from 0.2.0 to
+0.3.1 was deleted in 0.3.2, when stapel-chat 0.6.0 grew subjects of its own.
+Every key here is either an axis or a comm Function NAME: point one at your
+own provider and the answer changes with no fork.
 
 ## stapel-classified — `STAPEL_CLASSIFIED`
 
 | Key | Source | Purpose | Required | Default |
 |-----|--------|---------|----------|---------|
 | BLOCK_ENFORCEMENT | env | `auto` (enforce where a block provider answers; announce at boot where none does) / `required` (a missing provider is a boot ERROR, `classified.E002`) / `off` (a disclosed statement, `classified.W002`). In every state a provider that is present and FAILS answers 503 — an outage is not consent. | no | `required` |
-| BLOCK_FUNCTION | env | comm Function answering "is there a block between these two". `{"pairs": [[a,b],…]} -> {"blocked": [[a,b],…]}`, either direction. stapel-profiles owns the relationship and does not publish this yet. | no | `profiles.relationships` |
+| BLOCK_FUNCTION | env | comm Function answering "is there a block between these two". `{"pairs": [[a,b],…]} -> {"blocked": [[a,b],…]}`, either direction. Served by stapel-profiles >= 0.16.0. | no | `profiles.relationships` |
+| CONVERSATION_PARTICIPANTS_FUNCTION | env | Who is in a thread and what it is about — `{"conversation_ids": […]} -> {"conversations": {id: {exists, kind, scope_key, subject_type, subject_key, participants}}}`. Served by stapel-chat >= 0.6.0; it replaced this module's own binding table in 0.3.2. The one read here with NO degraded form: unreachable = 503, because an empty answer would read as "you are not a party to any of these". | no | `chat.conversation_participants` |
 | LISTING_DOCUMENTS_FUNCTION | env | Where every listing card comes from. Serves ALL statuses, which is why a card can say "sold" and "gone" where a public read 404s. | no | `listings.search_documents` |
 | DISPLAY_NAMES_FUNCTION | env | The counterparty's name. | no | `profiles.display_names` |
 | PUBLIC_PROFILE_FUNCTION | env | Avatar (fleet image object), member-since (date), seller type — served by stapel-profiles >= 0.16.0 as `profiles.public_cards`. Set `""` on a deployment without profiles: the counterparty card then answers `meta_status: partial`. | no | `profiles.public_cards` |
@@ -42,6 +45,8 @@ Presets, not new keys — each one belongs to the member named in the header.
 | `STAPEL_MODERATION["TARGET_TYPES"]["listing"]` | pre-publication gate, `listings.moderation_content`, `listing_blocked` letter | stapel-moderation is target-generic and ships an empty registry. |
 | `STAPEL_MODERATION["TARGET_TYPES"]["review"]` | post-publication gate, `reviews.moderation_content`, no letter, narrowed reason list | same, for the other target. |
 | `STAPEL_MODERATION["TARGET_TYPES"]["seller"]` | post gate, `classified.seller_content` (served HERE), no verdict topic | a marketplace can be asked to act against a seller, and the fleet serves no `profiles.moderation_content` — so the composite serves the marketplace-shaped answer itself. |
+| `STAPEL_CHAT["SUBJECT_TYPES"]["listing"]` | `card_function: classified.subject_cards` | chat's subject registry ships EMPTY — `listing` belongs to whoever owns listings. Without this entry chat refuses `subject_type="listing"` (400 `chat_unknown_subject_type`) and a marketplace cannot say what a conversation is about. Declared for a module that is not a member, because a host that mounts chat here needs it. |
+| `STAPEL_CHAT["BLOCK_ENFORCEMENT"]` | `required` | chat's own default is `auto` (a generic chat may ship without stapel-profiles). A classified marketplace runs profiles, so this composite sets the same `required` it sets for itself: "blocks are not enforced here" must be read, not inherited. Lower it knowingly or not at all. |
 | `STAPEL_MODERATION["TARGET_TYPES"]["chat_message"]` | post gate, `chat.moderation_content` keyed `message_id`, `can_report` = `classified.can_report_message` | the key is this composite's `<conversation_id>:<message_id>`: chat reads the message half, and only this package can answer off the conversation half whether the reporter was in the thread at all. Evidence-based until 0.3.0, when stapel-chat 0.5.0 started serving the content. |
 | `STAPEL_MODERATION["REASONS"]` | `prohibited_item`, `misleading_price`, `already_sold`, `impersonation` | the complaint taxonomy is universal and moderation ships one; these are the codes a MARKETPLACE needs on top, merged over the built-ins. |
 | `STAPEL_REVIEWS["TARGET_TYPES"]["listing"]` | post-moderated, one per author, responses allowed | stapel-reviews is target-generic and ships an empty registry. |

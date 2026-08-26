@@ -75,6 +75,12 @@ def test_system_checks_report_no_errors():
     ``blacklist.W002`` (LocMemCache) and ``chat.W001`` (one scope, because a
     marketplace is not multi-tenant). Anything else — and any ERROR at all —
     fails.
+
+    ``classified.W001`` was expected here until 0.3.2 and must now be ABSENT:
+    stapel_profiles is mounted, so this host has the block provider its
+    ``BLOCK_ENFORCEMENT="required"`` demands. That flip is the whole point of
+    the check — it is how a deployment learns which of the two states it is
+    in, and the harness is now in the enforcing one.
     """
     from django.core.checks import Error, run_checks
 
@@ -93,27 +99,31 @@ def test_system_checks_report_no_errors():
             #     verdict to an account or to a message; their consequence is
             #     a Sanction. The check exists so that is a decision, not a
             #     forgotten key.
-            #   classified.W001 — no block provider is reachable here, so
-            #     blocks are not enforced. That is the FLEET's state today
-            #     (stapel-profiles owns the relationship and publishes no
-            #     comm read of it) and the whole point of the check is that a
-            #     deployment is told at every boot instead of assuming.
             #   chat.W001 — every conversation lives in the single default
             #     scope. A marketplace is not multi-tenant, so that is the
             #     right answer here and stapel-workspaces is deliberately not
             #     in this host.
             "stapel_moderation.W006",
-            "stapel_classified.W001",
             "stapel_chat.W001",
         )
     ]
     assert unexpected == [], [str(f) for f in unexpected]
 
-    # …and the two that ARE expected must actually be there: a check that
+    # …and the one that IS expected must actually be there: a check that
     # stopped firing would leave the same silence it was written to break.
     ids = {f.id for f in findings}
-    assert "stapel_classified.W001" in ids
     assert "stapel_moderation.W006" in ids
+    # The block posture is enforced, not merely declared: no W001 ("no block
+    # store here"), no W002 ("blocks are off"), no E002 ("required and
+    # missing"). Both this composite and the chat the preset configures are
+    # asking a real provider.
+    assert not {
+        "stapel_classified.W001",
+        "stapel_classified.W002",
+        "stapel_classified.E002",
+        "stapel_chat.W003",
+        "stapel_chat.W004",
+    } & ids
 
 
 def test_moderation_verdicts_are_not_crossed_between_members():

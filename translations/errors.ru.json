@@ -3,5 +3,6 @@
   "error.403.classified_contact_refused": "С этим продавцом нельзя связаться",
   "error.404.classified_conversation_not_found": "Диалог не найден",
   "error.404.classified_listing_not_found": "Этого объявления больше нет",
-  "error.503.classified_blocks_unavailable": "Связаться сейчас нельзя, попробуйте чуть позже"
+  "error.503.classified_blocks_unavailable": "Связаться сейчас нельзя, попробуйте чуть позже",
+  "error.503.classified_chat_unavailable": "Диалоги сейчас недоступны, попробуйте чуть позже"
 }

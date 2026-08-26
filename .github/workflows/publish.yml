@@ -41,9 +41,16 @@ jobs:
         run: pip install stapel-tools --quiet
 
       - name: Install test dependencies
-        run: pip install pytest pytest-django
+        # The `test` extra, not a hand-kept package list: what the suite needs
+        # is declared in pyproject.toml and tests/test_test_dependencies.py
+        # fails if the two disagree. 0.3.1 died here for want of `channels`.
+        run: pip install -e ".[test]"
 
       - name: Tests
+        env:
+          # A declared sibling that is missing FAILS instead of skipping: on
+          # CI the extra is installed, so a skip would mean it silently was not.
+          STAPEL_TEST_STRICT_SIBLINGS: "1"
         run: pytest tests/ -v
 
   build:

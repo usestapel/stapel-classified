@@ -1,5 +1,152 @@
 # Changelog
 
+## 0.3.2 — 2026-08-26
+
+### ⚠️ BREAKING — `ConversationSubject` is deleted, and the header is read from chat
+
+The table this composite owned from 0.2.0 is **gone**, with its model, its
+migration and the endpoint that wrote it. It existed for exactly one reason,
+stated in its own docstring the day it was written: stapel-chat keyed a direct
+thread by the participant PAIR alone, so one buyer and one seller could hold
+exactly ONE thread whatever they discussed, and something had to record which
+listing each "contact the seller" was about. **stapel-chat 0.6.0 put the
+subject into `direct_key`** — each listing gets its own thread — **and shipped
+`chat.conversation_participants`**, so a server can ask who is in a thread
+instead of keeping a copy. Both asks are struck from MODULE.md. The workaround
+was deleted rather than kept in sync, per the alpha policy: no back-compat
+shim, no shadow copy, no dual-read window.
+
+**Read this if you are upgrading a live deployment — chat says it loudly and
+so does this:**
+
+> **The first subject-bearing contact after the upgrade opens a NEW thread
+> beside the pre-subject one.** A buyer and a seller who already correspond
+> have a thread whose `direct_key` carries no subject; the next "write to the
+> seller" about a listing produces a *second* thread, about that listing.
+> Nothing is migrated and nothing is lost — chat's subject-less key is
+> byte-identical to the old one, so every existing thread keeps its id, its
+> messages and its participants, and it stays the pair's "about nothing in
+> particular" thread. Expect users with existing correspondents to see one
+> additional thread appear. Adopting the old thread instead would mean
+> deciding *which* of its subjects it was really about, and that is a question
+> only a product can answer — which is why neither chat nor this module
+> answers it.
+
+**The migration path goes with the model.** `stapel_classified/migrations/` is
+deleted, not replaced by a `DeleteModel` — this package now has no models and
+therefore no migrations, which `test_no_missing_migrations` asserts. A
+`DeleteModel` would have had to claim one of two things the expand/contract
+gate checks for and neither is true here: `contract-phase` says the code
+stopped using the target *a release ago* (it stopped in this one), and
+`cutover-phase` requires a data-carrying `RunPython` that moves the rows
+somewhere — and there is nowhere to move them TO. Stamping one of those
+subjects onto a pre-0.6.0 thread would put a listing's header over a
+conversation that predates it, which is the one thing chat's own release notes
+refuse to do.
+
+> **Operator step, if you ever ran 0.2.0–0.3.1:** the table is orphaned, not
+> dropped — nothing reads or writes it, and Django no longer knows about it.
+> Drop it when convenient:
+> `DROP TABLE IF EXISTS classified_conversation_subject;`
+
+### Changed — the surface
+
+- **`POST /classified/api/v1/conversations` records nothing, and answers 200
+  instead of 201.** It is a **verification** now, not a claim: the listing
+  exists, the caller is not its seller, **chat agrees the caller is in that
+  thread and that its subject really is that listing**, and no block stands
+  between the two. That last-but-one check closes MODULE.md's oldest known
+  limitation — "a binding is a claim by the person who makes it" — because
+  there is no longer anything for a caller to claim. `scope_key` is gone from
+  the request: chat holds the thread's scope and this reads it back.
+- **The client flow is one call shorter.** Create the thread in chat WITH its
+  subject (`subject_type: "listing"`, `subject_key: "<listing id>"`); chat
+  inlines the card via `classified.subject_cards`. See
+  `docs/frontend-contract.md` §2.1.
+- **`subject.bound_at` and `previous_subjects` are removed** (not emptied). A
+  thread is about one thing now; `previous_subjects` was the honest mirror of
+  chat's old arithmetic and would have been permanently `[]`.
+- **`subject.meta_status` / `meta_reason` are new.** The one hole nothing in
+  the fleet can close at creation time — a thread whose subject names a listing
+  whose OWNER is not in it — is now *rendered* rather than hidden:
+  `partial` / `subject_owner_not_a_party`. Chat may not know what a listing is,
+  so it cannot refuse one; this module can only notice while building the
+  header, and a 404 there would also hide honest threads.
+- **New error key `error.503.classified_chat_unavailable`** (+ ru/es). A chat
+  that cannot be asked is a 503, never an empty page: an empty page is
+  indistinguishable from "you are not a party to any of these", and a reader
+  would take an outage for a permission boundary.
+- **`classified.can_report_message` asks chat who is in the thread.** It read
+  the binding row before — a copy of chat's membership that nothing could
+  refresh. Still fail-closed, and an unreachable chat is a refusal.
+- **This package now owns no models at all**, asserted by
+  `test_reports.py::test_this_package_owns_no_queue`.
+
+### Added — the composite declares chat's `listing` subject type
+
+`preset.SETTINGS_DEFAULTS["STAPEL_CHAT"]` is new, for a module that is still
+**not a member** (nothing here imports it, `URL_INCLUDES` mounts none of it) —
+but a host that mounts chat in a classified marketplace needs two things chat
+could not have defaulted:
+
+- **`SUBJECT_TYPES["listing"] → classified.subject_cards`.** Chat's registry
+  ships EMPTY on purpose (`listing` belongs to whoever owns listings), and
+  without this entry chat refuses `subject_type="listing"` with 400
+  `chat_unknown_subject_type`.
+- **`BLOCK_ENFORCEMENT: "required"`.** **chat's own default is `auto`** —
+  right for a generic chat that may ship without stapel-profiles. **This
+  composite sets `required` deliberately**, the same posture its own
+  `STAPEL_CLASSIFIED["BLOCK_ENFORCEMENT"]` has had since 0.3.1: a classified
+  marketplace runs profiles, blocks between strangers who trade are the point,
+  and "no block store here" must be a sentence an operator reads rather than a
+  default they inherit. A host that means it can lower either one knowingly.
+
+Note that chat 0.6.0 enforces blocks **at send**, not at conversation
+creation, so a blocked pair can still end up with an empty thread; this
+composite's own check is what refuses the contact before that. Closing it
+properly needs the same check inside chat's `create_direct` — routed upstream
+in MODULE.md.
+
+### Fixed — the suite runs against real providers, which is why 0.3.1 never published
+
+0.3.1's publish job died: with `BLOCK_ENFORCEMENT` defaulting to `required`,
+21 tests raised `BlockCheckUnavailable` because the harness registered no
+`profiles.relationships` provider, and `test_composite` failed on a `channels`
+import nothing had declared. **Both were the harness, and both are fixed as
+mechanisms rather than as settings.**
+
+- **stapel_profiles is MOUNTED in `conftest.py`**, the way chat and moderation
+  already were. A block in these tests is a real `UserRelationship` row read
+  back by profiles' real provider; the `profiles.display_names` and
+  `profiles.relationships` doubles are deleted. A suite that registers a
+  double for the module it is proving a seam against proves only that the
+  double agrees with itself. The default posture is unchanged and now asserted
+  (`test_required_is_the_default_and_this_harness_meets_it`); only the three
+  tests that assert the *no-provider* posture construct it, explicitly, with
+  the `no_block_provider` fixture. `classified.W001` is correspondingly no
+  longer expected in `test_system_checks_report_no_errors` — the harness is in
+  the enforcing state now, and that flip is what the check exists to announce.
+- **`[project.optional-dependencies].test` + `tests/test_test_dependencies.py`**
+  (ported from stapel-chat 0.5.1, which closed this defect class): every
+  sibling the suite needs is declared in `pyproject.toml`, and a gate parses
+  the suite and fails if the two disagree. It is extended here to catch
+  packages the suite MOUNTS as strings in `INSTALLED_APPS` and never imports —
+  which is most of a composite's dependencies, and exactly what `channels`
+  arrived through. Both workflows install `-e ".[test]"` and set
+  `STAPEL_TEST_STRICT_SIBLINGS=1`, so a missing declared sibling fails instead
+  of skipping quietly.
+
+### Changed — pins
+
+- **`stapel-chat>=0.6,<0.7`** (was `>=0.5,<0.6`) — now load-bearing: this
+  composite READS chat.
+- **`stapel-core>=0.45`** (was `>=0.43`) — chat 0.6.0's floor; a composite's
+  pin block exists to fix a combination that installs.
+- **`stapel-reviews>=0.2,<0.4` is pinned DIRECTLY** — `preset.INSTALLED_APPS`
+  mounts it and the seller rating reads `reviews.aggregate`, and it was
+  reaching this package only transitively through stapel-shop. The new
+  sibling-declaration gate is what noticed.
+
 ## 0.3.1 — 2026-08-24
 
 - stapel-profiles 0.16.0 serves `profiles.relationships` and `profiles.public_cards`, so the two settings this

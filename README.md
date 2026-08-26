@@ -10,7 +10,7 @@
 [![license](https://img.shields.io/github/license/usestapel/stapel-classified)](https://github.com/usestapel/stapel-classified/blob/main/LICENSE)
 [![llms.txt](https://img.shields.io/badge/llms.txt-blue)](https://github.com/usestapel/stapel-classified/blob/main/docs/llms.txt)
 
-> Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies and the marketplace reason taxonomy. Since 0.2.0 it also owns the one kind of state a composite may hold: the JOIN between a chat conversation and the listing it is about, because stapel-chat may not know what a listing is and stapel-listings may not know what a conversation is. Off that join it serves a conversation HEADER — the short listing card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone`, which is exactly the answer a public read cannot give) plus the counterparty's public seller card — and it enforces a user-to-user block at the one place a classified conversation begins, announcing at every boot whether that enforcement is live in this deployment.
+> Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies, the marketplace reason taxonomy, and (since 0.3.2) the `listing` subject type stapel-chat's registry ships empty of. Its own HTTP surface is a conversation HEADER, assembled from three modules that may not know about each other: chat says who is in the thread and what it is about, listings answers the short card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone` — exactly the answer a public read cannot give), profiles answers the counterparty. It owns NO table: the binding it kept from 0.2.0 to 0.3.1 existed only because chat could not tell two threads about two listings apart, and it was deleted rather than kept in sync the release chat could. It enforces a user-to-user block at the one place a classified contact begins, announcing at every boot whether that enforcement is live in this deployment.
 
 Part of the [Stapel framework](https://github.com/usestapel) — composable Django apps that deploy as a monolith or as microservices without changing module code.
 
@@ -24,13 +24,13 @@ pip install stapel-classified
 
 | Fact | Value |
 |---|---|
-| Version | `0.3.1` |
+| Version | `0.3.2` |
 | Python | `>=3.11` (3.11, 3.12, 3.13, 3.14) |
 | HTTP operations | 3 |
-| Config axes | 4 |
-| Usage surface | 9 |
+| Config axes | 5 |
+| Usage surface | 10 |
 | Extension points | 3 |
-| Error codes | 47 |
+| Error codes | 48 |
 | Fleet dependencies | [`stapel-attributes`](https://github.com/usestapel/stapel-attributes) · [`stapel-categories`](https://github.com/usestapel/stapel-categories) · [`stapel-cdn`](https://github.com/usestapel/stapel-cdn) (optional) · [`stapel-chat`](https://github.com/usestapel/stapel-chat) · [`stapel-geo`](https://github.com/usestapel/stapel-geo) · [`stapel-listings`](https://github.com/usestapel/stapel-listings) · [`stapel-moderation`](https://github.com/usestapel/stapel-moderation) · [`stapel-notifications`](https://github.com/usestapel/stapel-notifications) (optional) · [`stapel-profiles`](https://github.com/usestapel/stapel-profiles) (optional) · [`stapel-reviews`](https://github.com/usestapel/stapel-reviews) · [`stapel-search`](https://github.com/usestapel/stapel-search) |
 
 ## Documentation

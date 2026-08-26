@@ -1,18 +1,20 @@
-# stapel-classified 0.3.1
+# stapel-classified 0.3.2
 
-Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies and the marketplace reason taxonomy. Since 0.2.0 it also owns the one kind of state a composite may hold: the JOIN between a chat conversation and the listing it is about, because stapel-chat may not know what a listing is and stapel-listings may not know what a conversation is. Off that join it serves a conversation HEADER — the short listing card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone`, which is exactly the answer a public read cannot give) plus the counterparty's public seller card — and it enforces a user-to-user block at the one place a classified conversation begins, announcing at every boot whether that enforcement is live in this deployment.
+Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies, the marketplace reason taxonomy, and (since 0.3.2) the `listing` subject type stapel-chat's registry ships empty of. Its own HTTP surface is a conversation HEADER, assembled from three modules that may not know about each other: chat says who is in the thread and what it is about, listings answers the short card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone` — exactly the answer a public read cannot give), profiles answers the counterparty. It owns NO table: the binding it kept from 0.2.0 to 0.3.1 existed only because chat could not tell two threads about two listings apart, and it was deleted rather than kept in sync the release chat could. It enforces a user-to-user block at the one place a classified contact begins, announcing at every boot whether that enforcement is live in this deployment.
 
-Contract: axes 4 · surface 9 · extension points 3 · operations 3 · error codes 47.
+Contract: axes 5 · surface 10 · extension points 3 · operations 3 · error codes 48.
 Generated from docs/capabilities.json by `stapel-llms-txt` — do not edit; drift-gated by `make contract-check`.
 
 ## Configuration axes — what a product switches on
 Settings keys; `default` is what you get by saying nothing. Turning an axis off unmounts the operations it gates.
 - BLOCK_ENFORCEMENT [enum, default "required"] — Is a block actually enforced
-  Auto: enforced wherever a block provider answers, and where none is registered the deployment is told at every boot that blocks are not enforced here — the state the fleet is in today, printed rather than assumed. 'required' turns a missing provider into a boot error and is the posture for a deployment that runs a profile service; 'off' is a disclosed statement. In every state a provider that is present and FAILS answers 503, never 'allowed': an outage is not consent.
+  Default `required` since 0.3.1: stapel-profiles 0.16.0 serves the block check, so a deployment without a block provider must SAY so rather than inherit a silent one — a missing provider is a boot error (E002). `auto` is that knowing statement: enforced wherever a provider answers, and where none is registered the deployment is told at every boot (W001). `off` is a disclosed statement (W002). In every state a provider that is present and FAILS answers 503, never 'allowed': an outage is not consent. The composite's preset sets the same `required` on stapel-chat, whose own default is `auto` because a generic chat may ship without profiles.
 - BLOCK_FUNCTION [enum, default "profiles.relationships"] — Where a block is looked up
   The comm Function that answers 'is there a block between these two people'. A block belongs to the profile service and this composite keeps no copy of one; it asks, at the single place a classified conversation begins.
+- CONVERSATION_PARTICIPANTS_FUNCTION [enum, default "chat.conversation_participants"] — Who is in a conversation, and what it is about
+  The read that replaced this composite's own binding table in 0.3.2 (`chat.conversation_participants`, stapel-chat 0.6.0). It is the one seam here with no degraded form: an unreachable chat answers 503, because an empty page would be indistinguishable from 'you are not a party to any of these' and a reader would take an outage for a permission boundary.
 - PUBLIC_PROFILE_FUNCTION [enum, default "profiles.public_cards"] — How much of a seller the card can show
-  Empty by default because no such function exists in the fleet yet: the counterparty card then carries the display name and the rating and says, in the payload, that the avatar and member-since are missing and why. Naming a function that nobody serves would be a declared-and-unconnected dependency, which is the defect class this fleet gates against.
+  `profiles.public_cards`, served since stapel-profiles 0.16.0 — the avatar as the fleet image object, member-since, seller type. A deployment without profiles sets it empty and the counterparty card answers `partial` naming what is missing, rather than leaving a blank a client has to guess about.
 - SELLER_RATING_TARGET_TYPE [enum, default ""] — Whether sellers carry a rating
   Empty in the shipped scenario, because this composite registers reviews about listings rather than about people. A deployment that adds a seller review target names it here and the stars appear in every conversation header — with no release. Empty means the card says 'no rating', never a fabricated zero.
 
@@ -22,6 +24,9 @@ This is the answer to "does Stapel already have something for X?". `instead of` 
 - blocked_pairs — stapel_classified.blocks.blocked_pairs
   instead of: calling is_blocked in a loop
   The batch form: which of these pairs are blocked, in one call.
+- confirm_listing_conversation — stapel_classified.services.confirm_listing_conversation
+  instead of: storing a listing_id on your own chat model, trusting the client's word for what a thread is about
+  The 'write to the seller' moment, verified: the listing exists, the caller is not its seller, chat agrees the caller is in that thread and that it really is about that listing, and no block stands between the two. Answers the header the client is about to render, and records nothing.
 - is_blocked — stapel_classified.blocks.is_blocked
   instead of: hiding the button in the UI, querying a relationship table
   Whether a block stands between two users, in either direction, under this deployment's declared enforcement posture. Raises rather than answering False when a configured provider fails.
@@ -29,21 +34,21 @@ This is the answer to "does Stapel already have something for X?". `instead of` 
   instead of: assuming a comm function is reachable
   Why the configured block provider cannot be called here, or an empty string — what the boot check prints and what tells the difference between 'no blocks in this deployment' and 'the block store is down'.
 ### factory
-- bind_listing_conversation — stapel_classified.services.bind_listing_conversation
-  instead of: storing a listing_id on your own chat model
-  Record that a chat conversation is about a listing — the 'write to the seller' moment. Resolves the seller, refuses self-contact, enforces the block, and is idempotent per (conversation, listing).
+- chat_threads — stapel_classified.services.chat_threads
+  instead of: importing stapel_chat models from a composite, keeping your own copy of a conversation's participants
+  Ask chat who is in these conversations and what each is about, batched — the read that makes a second copy of chat's membership unnecessary. Raises rather than answering empty when chat cannot be reached.
 - conversation_context — stapel_classified.services.conversation_context
   instead of: fetching the listing and the profile separately in a client
   One conversation's header: the short listing card (including sold and deleted, which is when a buyer is most confused) and the counterparty's public seller card, from the reader's side.
 - conversation_contexts — stapel_classified.services.conversation_contexts
   instead of: looping conversation_context over a conversation list
   The batch form the inbox calls: a bounded page of headers in two comm reads, instead of one round trip per row.
-- current_subject — stapel_classified.services.current_subject
-  instead of: ConversationSubject.objects.filter(...).first()
-  The newest subject recorded for a conversation — the header's listing, when a thread has carried more than one.
 - listing_cards — stapel_classified.cards.listing_cards
   instead of: calling listings.search_documents and formatting a card yourself
   Keyed batch of short listing cards, gone ones included, with the CDN render metadata already merged over the primary image.
+- party_ids — stapel_classified.services.party_ids
+  instead of: reaching into the raw participants list in each caller
+  The user ids in one thread answer from chat_threads, as strings — the shape every authorization check here compares against.
 - seller_cards — stapel_classified.cards.seller_cards
   instead of: reading a Profile row or a User row for a chat header
   Keyed batch of PUBLIC seller cards — never more of a person than their public profile, whatever the caller holds.
@@ -60,12 +65,12 @@ This is the answer to "does Stapel already have something for X?". `instead of` 
 - stapel-attributes (required) — L1 library dependency of stapel-categories/stapel-listings; pip dependency, not a Django app (preset.py comment)
 - stapel-categories (required) — composite member, inherited from the shop scenario (preset.py INSTALLED_APPS/URL_INCLUDES)
 - stapel-cdn (optional) — reached by name (`cdn.describe_many`) for the card image's render metadata — the same contract stapel-chat uses for an attachment. Absent, the card keeps the image ref and says `meta_status: partial`
-- stapel-chat (required) — pinned (>=0.5) but not a member and never imported: the conversation ids this composite binds subjects to are chat's, and the `chat_message` moderation target names `chat.moderation_content`, which arrived in chat 0.5.0. Where no process serves that read, every complaint about a message answers 503 and moderation.W006 says so at boot
+- stapel-chat (required) — pinned (>=0.6) but not a member and never imported — it is ASKED, by name. Since 0.3.2 chat is the source of both halves of a conversation header: `chat.conversation_participants` answers who is in a thread and what it is about (0.6.0), and `chat.moderation_content` serves a reported message (0.5.0). Where no process serves those reads, a header answers 503 rather than an empty page and a complaint about a message answers 503 rather than a reporter's word for it
 - stapel-geo (required) — composite member — location binding for classified ads (preset.py INSTALLED_APPS/URL_INCLUDES)
 - stapel-listings (required) — composite member — the classified ad itself (preset.py INSTALLED_APPS/URL_INCLUDES)
 - stapel-moderation (required) — composite member — the cross-target queue; the composite declares its `listing`/`review`/`seller`/`chat_message` target policies and the marketplace reasons (preset.py SETTINGS_DEFAULTS). 0.3.0+ is required: a chat message is the first target here whose content is PRIVATE, and 0.3.0 is where `can_view_content` is asked on behalf of the moderator actually looking
 - stapel-notifications (optional) — not a member; when co-installed it routes the moderation letters (`listing_blocked`, `moderation.*`) the target policies name — absent, no letter is sent and nothing pretends one was
-- stapel-profiles (optional) — reached by name for the counterparty card (`profiles.display_names`) and for block enforcement (`profiles.relationships`, which profiles does not publish yet). Absent, the seller card is `partial` and `manage.py check` prints classified.W001 saying blocks are not enforced here
+- stapel-profiles (optional) — reached by name for the counterparty card (`profiles.display_names`, `profiles.public_cards`) and for block enforcement (`profiles.relationships`, served since profiles 0.16.0). Absent, the seller card is `partial` — and because BLOCK_ENFORCEMENT defaults to `required`, a deployment without it must say so with `auto` or fail its own boot check (classified.E002)
 - stapel-reviews (required) — composite member, inherited from the shop scenario (preset.py INSTALLED_APPS/URL_INCLUDES)
 - stapel-search (required) — composite member — the index, facets and geo radius over listings; the composite declares its `listing` source (preset.py SETTINGS_DEFAULTS, search_sources.py)
 
@@ -76,7 +81,7 @@ Paths are relative to `/classified/api/v1/`.
 - POST /conversations — classified_api_v1_conversations_create
 - GET /conversations/{conversation_id} — classified_api_v1_conversations_retrieve
 
-## Error codes (47) — the StapelError envelope
+## Error codes (48) — the StapelError envelope
 Render `t(code, params)`; branch UX on the remediation. Localized text lives in docs/errors.<lang>.md, not here.
 - error.400.bad_request [400] fix_input
 - error.400.captcha_invalid [400] retry
@@ -124,4 +129,5 @@ Render `t(code, params)`; branch UX on the remediation. Localized text lives in 
 - error.429.too_many_requests [429] wait_and_retry
 - error.500.internal [500] contact_support
 - error.503.classified_blocks_unavailable [503] wait_and_retry
+- error.503.classified_chat_unavailable [503] wait_and_retry
 - error.503.mandate_unavailable [503] retry

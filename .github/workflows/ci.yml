@@ -37,9 +37,12 @@ jobs:
         run: python -c "import stapel_classified; print('import OK')"
 
       - name: Install test dependencies
-        run: pip install pytest pytest-django pytest-cov "stapel-tools>=0.9.1,<1"
+        # The `test` extra — see tests/test_test_dependencies.py.
+        run: pip install -e ".[test]"
 
       - name: Tests with coverage
+        env:
+          STAPEL_TEST_STRICT_SIBLINGS: "1"
         run: |
           pytest tests/ \
             --cov=stapel_classified \

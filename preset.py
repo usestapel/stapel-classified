@@ -306,4 +306,33 @@ SETTINGS_DEFAULTS = {
         # rating that is always null and a lookup that always misses.
         "SELLER_RATING_TARGET_TYPE": "",
     },
+    # ── stapel-chat, which is NOT a member of this composite ─────────
+    # Mounting chat stays a host's decision (nothing here imports it and
+    # URL_INCLUDES mounts none of it), but a host that mounts one in a
+    # classified marketplace needs these two, and neither has a safe default
+    # chat could have shipped:
+    #
+    # SUBJECT_TYPES — chat's registry ships EMPTY on purpose, because
+    # `listing` belongs to whoever owns listings. Without this entry chat
+    # refuses `subject_type="listing"` at creation (400
+    # chat_unknown_subject_type) and the marketplace has no way to say what a
+    # conversation is about. `classified.subject_cards` is the same card
+    # builder the header views use, so one listing has one card everywhere.
+    #
+    # BLOCK_ENFORCEMENT — chat's own default is "auto" (enforce when a
+    # provider is reachable), which is right for a generic chat that may ship
+    # without stapel-profiles. This composite sets "required" DELIBERATELY:
+    # a classified marketplace runs profiles, blocks between strangers who
+    # trade are the point, and a silent "no block store here" is exactly the
+    # posture stapel-classified's own default refuses. It is a floor a host
+    # can lower knowingly, not a default it inherits by accident.
+    "STAPEL_CHAT": {
+        "SUBJECT_TYPES": {
+            "listing": {
+                "card_function": "classified.subject_cards",
+                "label": "chat.subject.listing",
+            },
+        },
+        "BLOCK_ENFORCEMENT": "required",
+    },
 }

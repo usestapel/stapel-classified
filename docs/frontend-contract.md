@@ -3,8 +3,9 @@
 > Written for the agent building the classified pair in the stapel-react
 > monorepo (the chat screen, the conversation list, the report dialog and
 > the block affordance). This is the server side of "with whom, and about
-> what". Backend version: **stapel-classified 0.3.0**, alongside
-> **stapel-chat 0.5.0** and **stapel-moderation 0.3.0**.
+> what". Backend version: **stapel-classified 0.3.2**, alongside
+> **stapel-chat 0.6.0**, **stapel-profiles 0.16.0** and
+> **stapel-moderation 0.3.0**.
 
 ## 0. Why this document exists
 
@@ -49,37 +50,57 @@ what they are trading.
 
 ### 2.1 `POST /classified/api/v1/conversations` — "write to the seller"
 
-The button on a listing page. **Two steps, in this order**, because
-stapel-chat 0.4.0 has no server-side create hook (see §7):
+The button on a listing page. **The subject goes to CHAT now** (0.3.2, with
+stapel-chat 0.6.0): a direct thread's identity includes what it is about, so
+the thread is created about the listing rather than labelled afterwards.
 
 ```js
-// 1. chat creates (or returns) the direct thread
+// 1. chat creates (or returns) the direct thread ABOUT this listing
 const conv = await post("/chat/api/v1/conversations", {
-  kind: "direct", participant_ids: [sellerId],
+  kind: "direct",
+  participant_ids: [sellerId],
+  subject_type: "listing",
+  subject_key: String(listingId),
 });
 
-// 2. classified records what it is about, and answers the header
+// 2. classified confirms the contact and answers the full header
 const header = await post("/classified/api/v1/conversations", {
   conversation_id: conv.id,
   listing_id: String(listingId),
 });
 ```
 
+Step 2 is a **check**, not a write: it is where the listing's existence, the
+"not your own listing" rule and the **block** are enforced, and it answers the
+header so you do not need a third call. Chat's own 201 already inlines the
+listing card (chat resolves it through `classified.subject_cards`), so a skin
+that only needs the card can render from step 1 while step 2 is in flight —
+but do not treat the thread as open until step 2 answers 200, because that is
+where a refused contact is refused.
+
 Request:
 
 ```jsonc
 {
   "conversation_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",  // from chat
-  "listing_id": "412",
-  "scope_key": ""            // optional; mirror chat's scope_key if you use one
+  "listing_id": "412"
 }
 ```
 
-`201` answers the **full header** (§3) — render it immediately, do not make a
-second call.
+`200` (**not 201** — nothing is created here since 0.3.2) answers the **full
+header** (§3).
 
-Idempotent: the same `(conversation, listing)` pair posted twice is one fact,
-and the first writer's parties stand. Retry freely.
+Safe to repeat: it records nothing, so a retry or a second tab is the same
+answer. `scope_key` is gone from the request — chat holds the thread's scope
+and this reads it back.
+
+**One buyer + one seller + two listings = two threads.** Chat keys a direct
+thread by the pair AND the subject, so "write to the seller" about a second
+listing opens a second conversation rather than landing in the first one's.
+A pair that was already talking before their deployment upgraded to chat 0.6.0
+keeps that older thread as an "about nothing in particular" one, and the first
+subject-bearing contact appears NEXT TO it — expect users to see one extra
+row, once.
 
 Refusals:
 
@@ -88,19 +109,25 @@ Refusals:
 | `400` | `error.400.classified_own_listing` | Hide the button on your own listing; this is the belt-and-braces case. |
 | `404` | `error.404.classified_listing_not_found` | The listing was deleted between page load and click. Say so; do not open an empty chat. |
 | `403` | `error.403.classified_contact_refused` | "This seller cannot be contacted." **Do not** say "you are blocked" or "they blocked you" — the server deliberately does not tell you which, and neither should the UI (§6). |
+| `404` | `error.404.classified_conversation_not_found` | Chat has no such thread, you are not in it, or its subject is a different listing. Same answer for all three, on purpose (§2.2). |
 | `503` | `error.503.classified_blocks_unavailable` | Retryable. The block store could not be asked, and the server refuses rather than guessing. Offer "try again". |
+| `503` | `error.503.classified_chat_unavailable` | Retryable. Chat could not be asked who is in the thread. **Never render an empty header as "no subject"** — that is a different fact. |
 
 ### 2.2 `GET /classified/api/v1/conversations/{conversation_id}` — one header
 
 For the open thread. Answers §3, or `404`
 `error.404.classified_conversation_not_found` — which is **also** what a
-conversation you are not a party of answers, and what a conversation nobody
-ever bound answers. The three are indistinguishable on purpose: a 403 would
-confirm that an id names a real thread.
+conversation you are not a party of answers, and what a conversation with no
+listing subject answers. The three are indistinguishable on purpose: a 403
+would confirm that an id names a real thread.
 
-A conversation with no binding is a legitimate state (a support thread, a
-thread created before 0.2.0). Render the chat without a header rather than an
-error page.
+A conversation with **no subject** is a legitimate, permanent state — a
+support thread, a group room, and every direct thread created before the
+deployment moved to chat 0.6.0. Render the chat without a header rather than
+an error page.
+
+`503` `error.503.classified_chat_unavailable` is different and must not be
+smoothed into the 404: it means chat could not be asked at all. Retry.
 
 ### 2.3 `POST /classified/api/v1/conversations/contexts` — a page of headers
 
@@ -113,7 +140,7 @@ For the conversation list. One call per page, never one per row.
 // response
 {
   "items": { "3fa85f64-…": { /* header, §3 */ } },
-  "missing": ["b1d2…"]     // unbound, or not yours — same meaning, see 2.2
+  "missing": ["b1d2…"]     // no listing subject, or not yours — see 2.2
 }
 ```
 
@@ -132,7 +159,8 @@ list, its order and its unread counts.
   "subject": {
     "type": "listing",
     "key": "412",
-    "bound_at": "2026-08-24T10:00:00+00:00",
+    "meta_status": "ok",               // "partial" -> read meta_reason
+    "meta_reason": null,
     "listing": {
       "listing_id": "412",
       "title": "Apple iPhone 13 Pro",
@@ -167,10 +195,9 @@ list, its order and its unread counts.
     "seller_type": "",                 // "" | "private" | "business" (see §7)
     "rating": { "avg": 4.8, "count": 12 },   // or null — never a fabricated zero
     "url": "",
-    "meta_status": "partial",
-    "meta_reason": "profile_unavailable"
-  },
-  "previous_subjects": [ /* same shape as `subject`, newest first */ ]
+    "meta_status": "ok",
+    "meta_reason": null
+  }
 }
 ```
 
@@ -209,22 +236,25 @@ attachment renderer:
 
 ### 3.3 `meta_status` on the counterparty
 
-`partial` + `profile_unavailable` is the **expected** answer in today's
-fleet: no service publishes a public-profile comm read yet (§7), so the card
-carries the display name and the rating and says the rest is missing. Render
-initials in place of the avatar and omit member-since. Do **not** treat it as
-an error, and do not fetch the profile REST endpoint yourself to fill it —
-the day the function ships, the same payload arrives complete.
+`ok` is the normal answer where stapel-profiles >= 0.16.0 is deployed.
+`partial` + `profile_unavailable` means the profile service could not be
+asked: the card still carries what is known and says the rest is missing.
+Render initials in place of the avatar and omit member-since. Do **not** treat
+it as an error, and do not fetch the profile REST endpoint yourself to fill it.
 
-### 3.4 `previous_subjects` — why a thread can have two listings
+An empty `display_name` is **not** a degradation — it is a person who has
+typed no name. Render initials; never invent a placeholder.
 
-chat 0.4.0 keys a direct thread by the participant **pair**, so one buyer and
-one seller have exactly one thread however many listings they discuss. The
-newest binding is the header; the rest are here, newest first.
+### 3.4 `subject.meta_status` — a subject that is not this conversation's
 
-Render the current subject in the header. If `previous_subjects` is
-non-empty, a small "also discussed" affordance is enough. When chat ships
-subject-aware threads (§7) this array goes empty on its own — build for both.
+`partial` + `subject_owner_not_a_party` means the thread names a listing whose
+**owner is not in it**. Nothing can refuse that at creation time (chat may not
+know what a listing is), so the server renders it and says so rather than
+showing a stranger's listing as if it were what these two are discussing.
+
+Show the card, and a quiet marker beside it — "this listing does not belong to
+this conversation" — never a silent header. `previous_subjects` and
+`subject.bound_at` were removed in 0.3.2: a thread is about one thing now.
 
 ## 4. Reporting — moderation's surface, with this composite's targets
 

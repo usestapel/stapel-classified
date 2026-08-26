@@ -4,12 +4,12 @@ Two of them, and both exist because a domain-blind engine needs an answer
 only a composite can give:
 
 ``classified.subject_cards``
-    Keyed batch of short listing cards. This is the function stapel-chat will
-    name as its ``card_function`` the day it grows a subject registry — the
-    shape was designed against that ask (see MODULE.md, "What stapel-chat
-    needs to add"), and it is already what this module's own views use, so
-    the upstream landing adds nothing here. Until then a client calls the
-    REST surface and gets the same cards from the same builder.
+    Keyed batch of short listing cards. Since stapel-chat 0.6.0 this is the
+    ``card_function`` chat calls for a ``listing`` subject — the shape was
+    designed against that ask before chat had a registry to name it in, and
+    the preset declares the binding (``STAPEL_CHAT["SUBJECT_TYPES"]``). It is
+    also what this module's own header views use, so one listing has exactly
+    one card wherever it is rendered.
 
 ``classified.seller_content``
     The moderation content function for the ``seller`` target type. A
@@ -39,9 +39,9 @@ CAN_REPORT_MESSAGE = "classified.can_report_message"
 #: ``<conversation_id>:<message_id>``. The composite key is not decoration —
 #: a bare message id would be unauthorizable, because nobody in the fleet can
 #: say who was in a conversation from a message id alone. With the
-#: conversation in the key, THIS package can answer it off its own join
-#: table, which is what makes "only the two people in the thread may report
-#: what was said in it" a server rule instead of a client's good manners.
+#: conversation in the key, this package can ask chat who is in that thread,
+#: which is what makes "only the two people in the thread may report what was
+#: said in it" a server rule instead of a client's good manners.
 MESSAGE_KEY_SEPARATOR = ":"
 
 
@@ -90,29 +90,36 @@ def seller_content_function(payload: dict) -> dict:
 def can_report_message_function(payload: dict) -> dict:
     """May this user complain about that message? — the type's ``can_report``.
 
-    Answerable here and nowhere else: the target key carries the conversation,
-    and this package holds the only table in the fleet that says who the two
-    parties of a classified conversation are. Fail-CLOSED — an unparseable
-    key, an unbound conversation or an outsider all answer no. moderation's
-    default for a missing callback is fail-open, which is right for a public
-    listing and wrong for a private thread.
+    The target key carries the conversation, which is what makes "only the two
+    people in a thread may report what was said in it" a server rule instead
+    of a client's good manners. Until 0.3.2 the parties were read off this
+    package's own binding row — a copy of chat's membership that nothing could
+    refresh, so it was as stale as the last time somebody bound a subject.
+    They are read from chat itself now (``chat.conversation_participants``).
+
+    Fail-CLOSED — an unparseable key, an unknown conversation, an outsider, or
+    a chat that cannot be asked all answer no. moderation's default for a
+    missing callback is fail-open, which is right for a public listing and
+    wrong for a private thread; an unreachable chat is the same shape as an
+    unreachable block store, and an outage is not consent.
     """
-    from .models import ConversationSubject
+    from . import services
 
     target_key = str(payload.get("target_key") or "")
-    conversation_id, _, _message_id = target_key.partition(MESSAGE_KEY_SEPARATOR)
-    if not conversation_id or not _message_id:
+    conversation_id, _, message_id = target_key.partition(MESSAGE_KEY_SEPARATOR)
+    if not conversation_id or not message_id:
         return {"allowed": False, "reason": "malformed_key"}
 
     try:
-        rows = list(
-            ConversationSubject.objects.filter(conversation_id=conversation_id)[:1]
-        )
-    except (ValueError, TypeError):
-        return {"allowed": False, "reason": "malformed_key"}
-    if not rows:
-        return {"allowed": False, "reason": "unbound_conversation"}
-    return {"allowed": rows[0].involves(payload.get("reporter_id"))}
+        thread = services.chat_threads([conversation_id]).get(conversation_id) or {}
+    except services.ChatUnavailable:
+        return {"allowed": False, "reason": "chat_unavailable"}
+    if not thread.get("exists"):
+        return {"allowed": False, "reason": "unknown_conversation"}
+    return {
+        "allowed": str(payload.get("reporter_id") or "")
+        in services.party_ids(thread)
+    }
 
 
 __all__ = [

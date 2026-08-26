@@ -10,15 +10,16 @@ from django.urls import path
 
 from .errors import ClassifiedErrorKeysView
 from .views import (
-    ConversationBindView,
+    ConversationConfirmView,
     ConversationContextBatchView,
     ConversationContextView,
 )
 
 conversation_patterns = [
-    # Bind a chat conversation to the listing it is about, and read the
-    # header back. POST is the "I am writing to this seller" moment.
-    path("conversations", ConversationBindView.as_view(), name="classified-conversations"),
+    # Confirm that a contact about a listing is allowed, and read the header
+    # back. POST is the "I am writing to this seller" moment; it records
+    # nothing (chat holds the thread and its subject since 0.3.2).
+    path("conversations", ConversationConfirmView.as_view(), name="classified-conversations"),
     # Headers for a page of the inbox, one call.
     path(
         "conversations/contexts",

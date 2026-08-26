@@ -1,20 +1,44 @@
-"""Service layer: bind a conversation to its subject, and read the context.
+"""Service layer: read what a conversation is about, and who is in it.
 
-Two operations, and both exist because of one sentence from the owner after
-opening the live product's chat: it was "unclear with whom, and unclear about
-what". A messaging engine cannot fix that — it is not allowed to know what a
-listing is. A catalogue cannot fix it either. The join is the fix, and this
-is where it is made and read.
+Both facts now live in stapel-chat. Through 0.3.1 the first of them lived
+HERE, in a ``ConversationSubject`` table, because chat keyed a direct thread
+by the participant pair alone and one buyer and one seller could therefore
+hold exactly one thread whatever they discussed. chat 0.6.0 put the subject
+into ``direct_key``, so each listing gets its own thread, and shipped
+``chat.conversation_participants`` so a server can ask who is in one. The
+table was marked for deletion the day both landed and this is that day: it is
+gone, not shadowed, and nothing here keeps a second copy of either fact.
+
+What is left is the composite's actual job — the JOIN. Chat holds an opaque
+``(subject_type, subject_key)`` it may never parse; listings holds a listing
+that knows nothing about conversations; profiles holds a person. The header a
+buyer and a seller both need is assembled here, from three modules' answers,
+in the one package allowed to know all three exist.
 """
 from __future__ import annotations
 
 import logging
 
-from django.db import IntegrityError, transaction
-
-from .models import SUBJECT_TYPE_LISTING, ConversationSubject
-
 logger = logging.getLogger(__name__)
+
+#: The only subject type this composite serves. A string rather than an enum:
+#: it travels to stapel-chat as an opaque name (``STAPEL_CHAT["SUBJECT_TYPES"]``
+#: — see preset.py) and an enum here would be a second vocabulary to keep in
+#: step with that one.
+SUBJECT_TYPE_LISTING = "listing"
+
+#: What chat calls a two-party thread. A group room can carry a subject too,
+#: and the header renders one; the block check below is about opening a
+#: DIRECT conversation with a seller, which is the only contact this module
+#: knows how to refuse.
+KIND_DIRECT = "direct"
+
+#: Why a header is degraded. The subject's key names a listing whose owner is
+#: not in the thread — nothing in the fleet can refuse that at creation time
+#: (chat may not know what a listing is), so it is rendered rather than
+#: hidden: the badge is the closure, not a 404 that would also hide honest
+#: threads.
+REASON_OWNER_NOT_A_PARTY = "subject_owner_not_a_party"
 
 
 class ClassifiedError(Exception):
@@ -22,15 +46,15 @@ class ClassifiedError(Exception):
 
 
 class SubjectNotFound(ClassifiedError):
-    """The listing named by a binding request does not exist (404)."""
+    """The listing named by the request does not exist (404)."""
 
 
 class ConversationNotBound(ClassifiedError):
-    """No subject has ever been recorded for this conversation (404)."""
+    """Chat has no such thread, or it is not about that listing (404)."""
 
 
 class NotAParty(ClassifiedError):
-    """The caller is neither party of the bound conversation (404-shaped)."""
+    """The caller is not a party to the conversation (404-shaped)."""
 
 
 class OwnListing(ClassifiedError):
@@ -41,28 +65,89 @@ class ContactRefused(ClassifiedError):
     """A block stands between the two parties (403)."""
 
 
-# ── Binding ──────────────────────────────────────────────────────────
+class ChatUnavailable(ClassifiedError):
+    """Chat is the source of both facts and could not be asked (503).
+
+    Never an empty answer. An empty answer is indistinguishable from "you are
+    not a party to any of these", which is a 404 — and a reader would take a
+    chat outage for a permission boundary.
+    """
 
 
-def bind_listing_conversation(
+# ── The one read this module makes of chat ───────────────────────────
+
+
+def chat_threads(conversation_ids) -> dict:
+    """``[id, …] -> {id: {exists, kind, scope_key, subject_*, participants}}``.
+
+    ``chat.conversation_participants`` (stapel-chat 0.6.0), by NAME — this
+    package imports no chat module and mounts none of it, so a deployment
+    that runs chat in another process changes nothing here.
+    """
+    from stapel_core.comm import call
+
+    from .conf import classified_settings
+
+    wanted = [str(cid) for cid in conversation_ids if str(cid or "").strip()]
+    if not wanted:
+        return {}
+
+    name = classified_settings.CONVERSATION_PARTICIPANTS_FUNCTION or ""
+    if not name:
+        raise ChatUnavailable("no CONVERSATION_PARTICIPANTS_FUNCTION configured")
+    try:
+        answer = call(
+            name,
+            {"conversation_ids": wanted},
+            timeout=float(classified_settings.CALL_TIMEOUT_SECONDS),
+        )
+    except Exception as exc:  # noqa: BLE001 — see ChatUnavailable
+        logger.warning("classified: participants read via %r failed: %s", name, exc)
+        raise ChatUnavailable(
+            f"{exc} — if the chat service answered 'no such function', it is "
+            f"older than stapel-chat 0.6.0, which is the first release "
+            f"serving {name!r}"
+        ) from exc
+    return (answer or {}).get("conversations") or {}
+
+
+def party_ids(thread: dict) -> list:
+    return [
+        str(p.get("user_id") or "")
+        for p in (thread.get("participants") or [])
+        if str(p.get("user_id") or "")
+    ]
+
+
+# ── Contact ──────────────────────────────────────────────────────────
+
+
+def confirm_listing_conversation(
     *,
     conversation_id,
     listing_key,
     actor_id,
-    scope_key: str = "",
-) -> ConversationSubject:
-    """Record that ``conversation_id`` is about ``listing_key``.
+) -> dict:
+    """Check that this contact is allowed, and answer the header for it.
 
-    Called by the buyer's client immediately after chat has created (or
-    returned) the direct conversation — chat 0.4.0 publishes no
-    ``conversation.created`` event and no comm Function to create one from a
-    server, both of which are routed upstream. Until then the client holds
-    the handle and this is where it lands.
+    This used to WRITE the binding (``bind_listing_conversation``): the client
+    created a thread in chat, then told this module what it was about, and
+    every later read was authorized against that claim. Chat owns the subject
+    now, so there is nothing to record — what is left is the half a claim
+    could never be, a **verification**:
 
-    Order of checks is deliberate: the listing first (it produces the 404 and
-    tells us who the seller is), self-contact next (cheap, and a block check
-    against yourself is meaningless), the block last (it is the only one that
-    can be a remote call and the only one that can answer 503).
+    - the listing exists (a 404 nobody else in the fleet can produce, because
+      chat may not know what a listing is);
+    - the caller is not its seller (contacting yourself is not contact);
+    - chat agrees the thread exists, that the caller is in it, and that its
+      subject really is that listing — the "a binding is a claim by the person
+      who makes it" limitation of 0.3.x, closed;
+    - and no block stands between the two parties.
+
+    Order is deliberate and unchanged: the listing first (it produces the 404
+    and names the seller), self-contact next (cheap, and a block check against
+    yourself is meaningless), then chat, then the block — the two that can be
+    remote calls and the two that can answer 503, last.
     """
     from . import blocks
     from .cards import STATE_GONE, listing_cards
@@ -70,63 +155,37 @@ def bind_listing_conversation(
     key = str(listing_key)
     card = listing_cards([key]).get(key) or {}
     if card.get("state") == STATE_GONE or not card.get("owner_id"):
-        # A listing nobody serves has no seller to introduce, so there is no
-        # conversation to open ABOUT it. A conversation already bound to it
-        # keeps working — see conversation_context, which renders the gone
-        # card rather than refusing the read.
+        # A listing nobody serves has no seller to introduce. A thread already
+        # about it keeps working — see conversation_contexts, which renders
+        # the gone card rather than refusing the read.
         raise SubjectNotFound(key)
 
     seller_id = str(card["owner_id"])
     if str(actor_id) == seller_id:
         raise OwnListing(key)
 
+    cid = str(conversation_id)
+    thread = chat_threads([cid]).get(cid) or {}
+    if not thread.get("exists"):
+        raise ConversationNotBound(cid)
+    if str(actor_id) not in party_ids(thread):
+        # 404-shaped, like every other refusal on this surface: a 403 would
+        # confirm the id names a real thread, and the id is the only thing
+        # keeping a stranger's conversation unprobed.
+        raise NotAParty(cid)
+    if (
+        thread.get("subject_type") != SUBJECT_TYPE_LISTING
+        or str(thread.get("subject_key") or "") != key
+    ):
+        raise ConversationNotBound(cid)
+
     if blocks.is_blocked(actor_id, seller_id):
         raise ContactRefused(key)
 
-    row = ConversationSubject(
-        scope_key=scope_key or "",
-        conversation_id=conversation_id,
-        subject_type=SUBJECT_TYPE_LISTING,
-        subject_key=key,
-        initiator_id=actor_id,
-        counterparty_id=seller_id,
-    )
-    try:
-        with transaction.atomic():
-            row.save()
-    except IntegrityError:
-        # Idempotent: the same (conversation, subject) pair is one fact,
-        # however many times a retried request or a second tab reports it.
-        # The FIRST writer's parties stand — a later caller cannot rewrite
-        # who the two sides of a thread are.
-        return ConversationSubject.objects.get(
-            conversation_id=conversation_id,
-            subject_type=SUBJECT_TYPE_LISTING,
-            subject_key=key,
-        )
-    return row
+    return conversation_context(cid, viewer_id=actor_id)
 
 
 # ── Reading ──────────────────────────────────────────────────────────
-
-
-def current_subject(conversation_id) -> ConversationSubject:
-    """The newest subject recorded for a conversation.
-
-    Newest rather than only: chat 0.4.0 gives one buyer and one seller a
-    single direct thread whatever they discuss, so a thread genuinely can be
-    about a second listing. The header shows the latest and the history is
-    the rest of the rows — see models.py for why that is honesty rather than
-    laxity.
-    """
-    row = (
-        ConversationSubject.objects.filter(conversation_id=conversation_id)
-        .order_by("-created_at")
-        .first()
-    )
-    if row is None:
-        raise ConversationNotBound(str(conversation_id))
-    return row
 
 
 def conversation_context(conversation_id, *, viewer_id) -> dict:
@@ -140,16 +199,17 @@ def conversation_context(conversation_id, *, viewer_id) -> dict:
 def conversation_contexts(conversation_ids, *, viewer_id) -> dict:
     """``{conversation_id: context}`` for a page of the inbox, in one pass.
 
-    Two comm reads for the whole page (documents, then their images) plus one
-    per distinct counterparty rating — never one round trip per row, which is
-    what makes a conversation list openable at all.
+    One participants read for the whole page, then two comm reads for the
+    cards (documents, then their images) plus one per distinct counterparty
+    rating — never one round trip per row, which is what makes a conversation
+    list openable at all.
 
     A conversation the viewer is not a party of is simply ABSENT from the
-    answer. Not a 403: a 403 would confirm that the id names a real thread,
-    and the ids are the only thing protecting a stranger's conversation from
-    being probed.
+    answer, and so is one chat says is about nothing (or about something this
+    composite does not serve). Not a 403: a 403 would confirm that the id
+    names a real thread.
     """
-    from .cards import listing_cards, seller_cards
+    from .cards import STATE_GONE, listing_cards, seller_cards
     from .conf import classified_settings
 
     wanted = [str(cid) for cid in conversation_ids if str(cid)]
@@ -158,71 +218,77 @@ def conversation_contexts(conversation_ids, *, viewer_id) -> dict:
     limit = int(classified_settings.CONTEXT_BATCH_LIMIT)
     wanted = list(dict.fromkeys(wanted))[:limit]
 
-    rows = ConversationSubject.objects.filter(conversation_id__in=wanted).order_by(
-        "-created_at"
-    )
-    current: dict[str, ConversationSubject] = {}
-    history: dict[str, list] = {}
-    for row in rows:
-        cid = str(row.conversation_id)
-        if cid not in current:
-            current[cid] = row
-        else:
-            history.setdefault(cid, []).append(row)
-
+    viewer = str(viewer_id)
+    threads = chat_threads(wanted)
     mine = {
-        cid: row for cid, row in current.items() if row.involves(viewer_id)
+        cid: thread
+        for cid, thread in threads.items()
+        if thread.get("exists")
+        and thread.get("subject_type") == SUBJECT_TYPE_LISTING
+        and str(thread.get("subject_key") or "")
+        and viewer in party_ids(thread)
     }
     if not mine:
         return {}
 
-    keys = {row.subject_key for row in mine.values()}
-    for extra in history.values():
-        keys.update(row.subject_key for row in extra)
-    cards = listing_cards(keys)
-    parties = seller_cards({row.other_party(viewer_id) for row in mine.values()})
+    cards = listing_cards({str(t["subject_key"]) for t in mine.values()})
+
+    counterparties: dict[str, str] = {}
+    for cid, thread in mine.items():
+        card = cards.get(str(thread["subject_key"])) or {}
+        owner = str(card.get("owner_id") or "")
+        others = [p for p in party_ids(thread) if p != viewer]
+        if owner and owner in others:
+            counterparties[cid] = owner
+        elif len(others) == 1:
+            counterparties[cid] = others[0]
+        else:
+            # A group room about a listing: several other people and no single
+            # "the other party". The header still renders its subject.
+            counterparties[cid] = ""
+    parties = seller_cards({uid for uid in counterparties.values() if uid})
 
     contexts = {}
-    for cid, row in mine.items():
+    for cid, thread in mine.items():
+        key = str(thread["subject_key"])
+        card = cards.get(key) or {}
+        owner = str(card.get("owner_id") or "")
+        parties_here = party_ids(thread)
+        # A gone listing has no owner to be a party — its card already says
+        # `gone`, and flagging that as a mismatched owner would name the same
+        # fact twice, in a field that means something else.
+        owner_is_known = bool(owner) and card.get("state") != STATE_GONE
+        degraded = owner_is_known and owner not in parties_here
         contexts[cid] = {
             "conversation_id": cid,
-            "scope_key": row.scope_key,
+            "scope_key": str(thread.get("scope_key") or ""),
             "subject": {
-                "type": row.subject_type,
-                "key": row.subject_key,
-                "listing": cards.get(row.subject_key),
-                "bound_at": row.created_at.isoformat(),
+                "type": SUBJECT_TYPE_LISTING,
+                "key": key,
+                "listing": card or None,
+                "meta_status": "partial" if degraded else "ok",
+                "meta_reason": REASON_OWNER_NOT_A_PARTY if degraded else None,
             },
-            "counterparty": parties.get(row.other_party(viewer_id)),
-            "viewer_role": (
-                "buyer" if str(viewer_id) == str(row.initiator_id) else "seller"
-            ),
-            # Every subject this thread has carried, newest first, minus the
-            # current one. Empty in a deployment whose chat keys threads by
-            # subject; non-empty on chat 0.4.0, where it is the only way to
-            # see that "that other listing" was discussed here too.
-            "previous_subjects": [
-                {
-                    "type": other.subject_type,
-                    "key": other.subject_key,
-                    "listing": cards.get(other.subject_key),
-                    "bound_at": other.created_at.isoformat(),
-                }
-                for other in history.get(cid, [])
-            ],
+            "counterparty": parties.get(counterparties[cid]),
+            "viewer_role": "seller" if owner_is_known and viewer == owner else "buyer",
         }
     return contexts
 
 
 __all__ = [
+    "KIND_DIRECT",
+    "REASON_OWNER_NOT_A_PARTY",
+    "SUBJECT_TYPE_LISTING",
+    "ChatUnavailable",
     "ClassifiedError",
     "ContactRefused",
     "ConversationNotBound",
     "NotAParty",
     "OwnListing",
     "SubjectNotFound",
-    "bind_listing_conversation",
+    "chat_threads",
+    "party_ids",
+    "confirm_listing_conversation",
     "conversation_context",
     "conversation_contexts",
-    "current_subject",
 ]

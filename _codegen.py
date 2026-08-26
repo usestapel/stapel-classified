@@ -21,7 +21,51 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from contextlib import contextmanager
 from pathlib import Path
+
+#: The packages whose error keys belong in THIS module's contract.
+#:
+#: The error registry is a process-global map holding every key any imported
+#: app registered, so an emitted errors.json is otherwise a function of what
+#: else is installed on the emitting machine — the drift that killed
+#: stapel-notifications 0.17.0 and 0.17.1 in their publish jobs. This harness
+#: mounts only {classified + core} today and so emits only those two, but the
+#: guard is what keeps that true when a sibling is added to
+#: `_codegen_settings` — and a composite is the module most likely to add one.
+#: Foreign keys are real and documented, in their owner's errors.json beside
+#: the catalogues that translate them. Here they are noise.
+OWNED_ERROR_PACKAGES = frozenset({"stapel_core", "stapel_classified"})
+
+
+@contextmanager
+def scoped_error_registry():
+    """Restrict the global error registry to :data:`OWNED_ERROR_PACKAGES`.
+
+    Wrap any emission that reads the registry, so the artifact describes this
+    library rather than this machine. Restored on exit: the runtime tests
+    still see the full key set, which is what ``/error-keys/`` serves.
+
+    It reaches for core's private maps because core exposes no owner filter
+    yet; a ``--owner`` option on ``generate_error_keys`` is the durable home
+    for this, and until it exists the scoping lives with the contract it
+    protects. (Pattern: stapel-notifications ``_codegen.py``.)
+    """
+    from stapel_core.django.api import errors as core_errors
+
+    saved_keys = dict(core_errors._GLOBAL_REGISTRY)
+    saved_owners = dict(core_errors._OWNER_REGISTRY)
+    for code, owner in saved_owners.items():
+        if owner is not None and owner not in OWNED_ERROR_PACKAGES:
+            core_errors._GLOBAL_REGISTRY.pop(code, None)
+            core_errors._OWNER_REGISTRY.pop(code, None)
+    try:
+        yield
+    finally:
+        core_errors._GLOBAL_REGISTRY.clear()
+        core_errors._GLOBAL_REGISTRY.update(saved_keys)
+        core_errors._OWNER_REGISTRY.clear()
+        core_errors._OWNER_REGISTRY.update(saved_owners)
 
 
 def _configure() -> None:
@@ -91,7 +135,8 @@ def main(argv: list[str] | None = None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     paths = emit_schema(out / "schema.json")
     flows = emit_flows(out / "flows.json")
-    errors = emit_errors(out / "errors.json")
+    with scoped_error_registry():
+        errors = emit_errors(out / "errors.json")
 
     print(
         f"stapel-classified contract: {paths} paths, {flows} flows, "

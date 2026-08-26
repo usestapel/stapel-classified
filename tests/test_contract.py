@@ -181,6 +181,28 @@ def test_the_card_is_typed_field_by_field():
     assert {"state", "status", "price", "currency", "image"} <= set(listing)
 
 
+def test_errors_json_describes_this_library_not_this_machine():
+    """The emitted key set must not depend on what else the venv has.
+
+    The error registry is process-global, so every imported app's keys land in
+    it; an emission that copied them out would produce a different artifact on
+    a workspace machine than on a clean runner — and a drift gate that fails
+    for a reason nobody changed. stapel-notifications died in its publish job
+    twice on exactly this, which is where `_codegen.scoped_error_registry`
+    comes from.
+    """
+    from stapel_classified._codegen import OWNED_ERROR_PACKAGES
+
+    keys = json.loads((DOCS / "errors.json").read_text())
+    owners = {k.get("owner") for k in keys}
+    assert owners <= set(OWNED_ERROR_PACKAGES) | {None}, sorted(
+        o for o in owners if o and o not in OWNED_ERROR_PACKAGES
+    )
+    # …and this module's own keys really are in there.
+    codes = {k["code"] for k in keys}
+    assert "error.503.classified_chat_unavailable" in codes
+
+
 # --- capabilities.json content sanity (capability-config.md §2) ---------------
 
 
@@ -189,14 +211,16 @@ def _capabilities() -> dict:
 
 
 def test_capabilities_axes_are_the_settings_that_change_the_deal():
-    """Four axes, and each changes what the product does to people: whether a
-    block is enforced at all, where a block is looked up, how much of a seller
-    the card may show, and whether sellers carry a rating. Batch limits,
-    timeouts and image tiers are tuning and deliberately absent."""
+    """Five axes, and each changes what the product does to people: whether a
+    block is enforced at all, where a block is looked up, who answers who is in
+    a conversation, how much of a seller the card may show, and whether sellers
+    carry a rating. Batch limits, timeouts and image tiers are tuning and
+    deliberately absent."""
     axes = {a["key"]: a for a in _capabilities()["axes"]}
     assert set(axes) == {
         "BLOCK_ENFORCEMENT",
         "BLOCK_FUNCTION",
+        "CONVERSATION_PARTICIPANTS_FUNCTION",
         "PUBLIC_PROFILE_FUNCTION",
         "SELLER_RATING_TARGET_TYPE",
     }

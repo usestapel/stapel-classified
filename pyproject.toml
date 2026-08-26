@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.3.1"
+version = "0.3.2"
 description = "Composite: classified ads — the shop composite + geo + search + moderation"
 readme = "README.md"
 license = { text = "MIT" }
@@ -37,14 +37,14 @@ classifiers = [
 # `content` is a declared field of the contract rather than a graft onto the
 # response dict.
 #
-# stapel-chat is pinned even though this package imports nothing from it and
-# mounts none of it: the `chat_message` moderation target names
-# `chat.moderation_content`, which arrived in chat 0.5.0, and
-# `submit_report` resolves a message's author through it. On chat 0.4 every
-# complaint about a message answers 503 — a resolver error is a much better
-# place to learn that than a moderator's queue. Mounting chat is still the
-# host's decision; the pin only fixes WHICH chat a deployment that has one
-# must be on.
+# stapel-chat's floor is 0.6 as of 0.3.2, and the pin is now load-bearing in a
+# way it was not: this composite READS chat. `chat.conversation_participants`
+# (0.6.0) is where a conversation's parties and its subject come from since
+# `ConversationSubject` was deleted, and `chat.moderation_content` (0.5.0)
+# serves a reported message. On chat 0.5 every conversation header answers 503
+# — a resolver error is a much better place to learn that than an empty inbox.
+# The composite still imports nothing from chat and mounts none of it; the pin
+# fixes WHICH chat a deployment that has one must be on.
 #
 # stapel-listings is pinned DIRECTLY too, for the same shape of reason:
 # `search_sources.listing_source()` imports `stapel_listings.models.
@@ -53,16 +53,36 @@ classifiers = [
 # off that set. Leaving the pin transitive would let a resolver settle on
 # whatever floor stapel-shop asks for and silently regress the seam this
 # composite is the one place that can prove.
+#
+# stapel-core's floor is 0.45 as of 0.3.2 — not because anything here needs a
+# 0.45 API, but because stapel-chat 0.6.0 does, and fixing a COMBINATION that
+# actually installs is the whole job of a composite's pin block. A resolver
+# left to reconcile core>=0.43 with chat>=0.6 finds the answer eventually; a
+# reader of this file should not have to.
+#
+# stapel-reviews is pinned DIRECTLY as of 0.3.2, at the range stapel-shop
+# already asks for: `preset.INSTALLED_APPS` mounts it and the header's seller
+# rating reads `reviews.aggregate`, so a module this composite MOUNTS was
+# reaching it only transitively. The sibling-declaration gate
+# (tests/test_test_dependencies.py) is what noticed.
 dependencies = [
-    "stapel-core>=0.43,<1.0",
+    "stapel-core>=0.45,<1.0",
+    "stapel-reviews>=0.2,<0.4",
     "stapel-shop>=0.2.3,<0.3",
     "stapel-categories>=0.5.6,<0.6",
     "stapel-listings>=0.5,<0.8",
     "stapel-geo>=0.2,<0.4",
     "stapel-search>=0.2.2,<0.3",
     "stapel-moderation>=0.3,<0.4",
-    "stapel-chat>=0.5,<0.6",
+    "stapel-chat>=0.6,<0.7",
 ]
+
+# The block harness this module ships (stapel_classified/testing.py). A
+# deployment that installs this composite inherits BLOCK_ENFORCEMENT="required"
+# and therefore needs a registered block provider in its OWN tests; making
+# every consumer invent one is how a default gets weakened instead of met.
+[project.entry-points.pytest11]
+stapel_classified = "stapel_classified.testing"
 
 [project.urls]
 Homepage = "https://github.com/usestapel/stapel-classified"
@@ -73,10 +93,39 @@ Issues = "https://github.com/usestapel/stapel-classified/issues"
 
 [project.optional-dependencies]
 all = []
+# What the TEST SUITE needs, as opposed to what the package needs. It is a
+# declaration, not a convenience: every sibling any test imports OR MOUNTS
+# belongs here, and tests/test_test_dependencies.py fails if one is missing.
+# 0.3.1 shipped red on CI precisely because this list did not exist — the
+# suite mounts stapel_chat, whose consumers need `channels`, which no file in
+# this repo asked for and no runner had. Ported from stapel-chat 0.5.1, where
+# the same defect class was closed with the same mechanism.
+test = [
+    "pytest",
+    "pytest-django",
+    "pytest-cov",
+    # stapel_realtime is mounted for chat's WebSocket substrate, and chat's
+    # deployment checks (E010-E014) import its consumers.
+    "channels",
+    "daphne",
+    "stapel-tools>=0.9.1,<1",
+    # Mounted in conftest.py, not imported by any test file: the block
+    # provider (`profiles.relationships`) BLOCK_ENFORCEMENT="required"
+    # demands, and the display-name/public-card reads the header makes.
+    # A harness with a fixture in its place proved only that the fixture
+    # agreed with itself.
+    "stapel-profiles>=0.16.0,<1.0",
+    "stapel-realtime[channels]>=0.1.2,<1.0",
+]
 
 [tool.setuptools]
 package-dir = {"stapel_classified" = "."}
-packages = ["stapel_classified", "stapel_classified.tests", "stapel_classified.migrations"]
+# No `stapel_classified.migrations`: since 0.3.2 this package owns no models
+# at all (see the CHANGELOG — `ConversationSubject` was deleted when
+# stapel-chat 0.6.0 grew subjects of its own), so it has no migration path
+# either. A composite with an empty model registry is the point, not an
+# oversight.
+packages = ["stapel_classified", "stapel_classified.tests"]
 
 [tool.setuptools.package-data]
 stapel_classified = ["py.typed", "docs/capabilities.json", "docs/llms.txt", "docs/flows.json", "docs/errors.json", "docs/schema.json", "docs/frontend-contract.md", "CONFIG.MD", "schemas/functions/*.json", "translations/*.json"]
