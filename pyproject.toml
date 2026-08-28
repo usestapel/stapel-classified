@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.4.0"
+version = "0.4.1"
 description = "Composite: classified ads — the shop composite + geo + search + moderation"
 readme = "README.md"
 license = { text = "MIT" }
@@ -68,9 +68,16 @@ classifiers = [
 dependencies = [
     "stapel-core>=0.45,<1.0",
     "stapel-reviews>=0.2,<0.4",
-    "stapel-shop>=0.2.3,<0.3",
+    "stapel-shop>=0.2.5,<0.3",
     "stapel-categories>=0.5.6,<0.6",
-    "stapel-listings>=0.5,<0.8",
+    # <0.9, not <0.8: 0.8.0 closes a live anonymous enumeration oracle — the
+    # status probe returned owner_id and moderation_status for any listing id,
+    # over sequential ids, including other people's drafts and deleted rows.
+    # Held at <0.8 this composite pins a fleet to the leaking version, and pip
+    # refuses the resolution outright rather than warning. The floor moves to
+    # 0.8 with the cap: there is no reason to let a deployment resolve back
+    # onto the leak.
+    "stapel-listings>=0.8,<0.9",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for

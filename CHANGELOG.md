@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.1 — 2026-08-28
+
+### The listings cap forbade the security fix
+
+`stapel-listings>=0.5,<0.8` kept every fleet installing this composite below
+0.8.0 — the release that stops the status probe handing `owner_id` and
+`moderation_status` to anyone for any listing id. Ids are sequential, so that
+was an anonymous enumeration oracle over other people's drafts, rejected and
+soft-deleted listings. Confirmed against a running stand.
+
+pip refuses that resolution outright rather than warning, so the cap did not
+discourage the upgrade — it made it impossible. `<0.9` now, and the **floor
+moves to 0.8 with it**: there is no reason to leave a deployment able to
+resolve back onto the leak.
+
+`stapel-shop` floor moves to 0.2.5 for the same reason — it carried the same
+cap, and a fleet resolving shop 0.2.4 would inherit `<0.8` through it.
+
 ## 0.4.0 — 2026-08-28
 
 Minor, and pre-1.0 house semver reads a minor as breaking. Two things leave
