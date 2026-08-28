@@ -1,12 +1,19 @@
 """Test fixtures for a deployment that installs this composite.
 
-``BLOCK_ENFORCEMENT`` defaults to ``required``, which means every test in
-every suite that touches a classified contact needs a REGISTERED
-``profiles.relationships`` provider or it raises
-:class:`~stapel_classified.blocks.BlockCheckUnavailable`. That is the default
-doing its job — but it makes "set up a working block store" a thing every
-consumer has to figure out, and 0.3.1's own publish job proves how that ends:
-21 tests red, and the tempting fix is to weaken the default.
+**This is not enforcement, it is the harness for somebody else's.** Since
+0.4.0 the block posture is stapel-chat's alone, and this composite's preset
+sets ``STAPEL_CHAT["BLOCK_ENFORCEMENT"] = "required"``. That means every test
+in every suite that opens a classified conversation needs a REGISTERED
+``profiles.relationships`` provider or ``create_direct`` raises
+:class:`~stapel_chat.blocks.BlockCheckUnavailable`. That is the posture doing
+its job — but it makes "set up a working block store" a thing every consumer
+has to figure out, and 0.3.1's own publish job proves how that ends: 21 tests
+red, and the tempting fix is to weaken the posture.
+
+The Function NAME the fixtures register under comes from
+``chat_settings.BLOCK_FUNCTION``, because that is the only key anything reads
+any more — a harness pointing at a name of its own would be the second axis
+this release deleted.
 
 So the harness ships with the module. Two backends, one API:
 
@@ -14,7 +21,8 @@ So the harness ships with the module. Two backends, one API:
   ``UserRelationship`` row, read back by profiles' own provider. Nothing is
   faked, which is the only way a test can prove the seam.
 * **it is not** — an explicit in-memory provider is registered under this
-  deployment's ``BLOCK_FUNCTION`` name, with the same request/response shape.
+  deployment's ``STAPEL_CHAT["BLOCK_FUNCTION"]`` name, with the same
+  request/response shape.
   A stated double, chosen by the absence of the real thing, rather than a
   silent one that shadows it.
 
@@ -99,7 +107,7 @@ class BlockStore:
         raise NotImplementedError
 
     def is_blocked(self, a, b) -> bool:
-        from . import blocks
+        from stapel_chat import blocks
 
         return blocks.is_blocked(self._id(a), self._id(b))
 
@@ -148,7 +156,7 @@ class _ProfilesBlockStore(BlockStore):
 
 
 class _MemoryBlockStore(BlockStore):
-    """An in-memory provider under this deployment's ``BLOCK_FUNCTION`` name."""
+    """In-memory, under this deployment's ``STAPEL_CHAT["BLOCK_FUNCTION"]``."""
 
     def __init__(self):
         super().__init__("memory")
@@ -184,11 +192,10 @@ def memory_block_provider():
     For a suite (or a script) with no stapel-profiles in it. Yields a
     :class:`BlockStore`; unregisters on exit, restoring whatever was there.
     """
+    from stapel_chat.conf import chat_settings
     from stapel_core.comm.registry import function_registry
 
-    from .conf import classified_settings
-
-    name = classified_settings.BLOCK_FUNCTION
+    name = chat_settings.BLOCK_FUNCTION
     store = _MemoryBlockStore()
     previous = function_registry._providers.get(name)
     previous_schema = function_registry._schemas.get(name)
@@ -219,8 +226,9 @@ if pytest is not None:
         """A working block store, whichever backend this project can have.
 
         Real profiles where profiles is mounted; an explicit in-memory
-        provider otherwise. Either way ``BLOCK_ENFORCEMENT="required"`` is
-        satisfied and the composite's contact path runs as it does in
+        provider otherwise. Either way ``STAPEL_CHAT["BLOCK_ENFORCEMENT"]
+        = "required"`` — the posture this composite's preset sets — is
+        satisfied, and opening a conversation runs as it does in
         production.
         """
         if profiles_is_mounted():
@@ -243,7 +251,7 @@ if pytest is not None:
         """The provider is REGISTERED and FAILING — the 503 case.
 
         Not the same as :func:`no_block_provider`: an outage is not a
-        deployment without a block store, and this module answers them
+        deployment without a block store, and stapel-chat answers them
         differently (503 vs the declared posture).
         """
         block_provider.set_unavailable(True)
@@ -254,16 +262,15 @@ if pytest is not None:
     def no_block_provider():
         """A deployment with NO block store: unregister the provider.
 
-        The posture ``BLOCK_ENFORCEMENT="auto"`` exists for, and the state
-        ``"required"`` refuses to boot in. Constructing it explicitly is the
+        The state ``STAPEL_CHAT["BLOCK_ENFORCEMENT"] = "auto"`` exists for,
+        and ``"required"`` refuses to boot in. Constructing it explicitly is the
         point — with a provider mounted it is no longer something a test gets
         by doing nothing.
         """
+        from stapel_chat.conf import chat_settings
         from stapel_core.comm.registry import function_registry
 
-        from .conf import classified_settings
-
-        name = classified_settings.BLOCK_FUNCTION
+        name = chat_settings.BLOCK_FUNCTION
         provider = function_registry._providers.pop(name, None)
         schema = function_registry._schemas.pop(name, None)
         try:

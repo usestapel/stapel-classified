@@ -211,15 +211,13 @@ def _capabilities() -> dict:
 
 
 def test_capabilities_axes_are_the_settings_that_change_the_deal():
-    """Five axes, and each changes what the product does to people: whether a
-    block is enforced at all, where a block is looked up, who answers who is in
-    a conversation, how much of a seller the card may show, and whether sellers
-    carry a rating. Batch limits, timeouts and image tiers are tuning and
-    deliberately absent."""
+    """Three axes, and each changes what the product does to people: who
+    answers who is in a conversation, how much of a seller the card may show,
+    and whether sellers carry a rating. Batch limits, timeouts and image tiers
+    are tuning and deliberately absent — and so is block enforcement, which is
+    stapel-chat's axis and appears in stapel-chat's capabilities (0.4.0)."""
     axes = {a["key"]: a for a in _capabilities()["axes"]}
     assert set(axes) == {
-        "BLOCK_ENFORCEMENT",
-        "BLOCK_FUNCTION",
         "CONVERSATION_PARTICIPANTS_FUNCTION",
         "PUBLIC_PROFILE_FUNCTION",
         "SELLER_RATING_TARGET_TYPE",
@@ -231,12 +229,15 @@ def test_capabilities_axes_are_the_settings_that_change_the_deal():
         assert axis["curated"]["business_label"]
 
 
-def test_the_block_posture_is_published_as_it_ships():
+def test_the_block_posture_is_published_on_the_one_axis_that_owns_it():
     """A capabilities document is what a reader trusts about a deployment's
-    posture. One that claimed enforcement while the code shipped 'auto' would
-    be worse than no document at all."""
+    posture. Two documents each claiming an axis for the same fact is worse
+    than one: it is how an operator sets the switch nothing reads."""
+    from stapel_classified import preset
+
     axes = {a["key"]: a for a in _capabilities()["axes"]}
-    assert axes["BLOCK_ENFORCEMENT"]["default"] == "required"
+    assert not [key for key in axes if key.startswith("BLOCK_")]
+    assert preset.SETTINGS_DEFAULTS["STAPEL_CHAT"]["BLOCK_ENFORCEMENT"] == "required"
     assert axes["PUBLIC_PROFILE_FUNCTION"]["default"] == "profiles.public_cards"
 
 

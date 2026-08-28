@@ -1,5 +1,114 @@
 # Changelog
 
+## 0.4.0 — 2026-08-28
+
+Minor, and pre-1.0 house semver reads a minor as breaking. Two things leave
+this package: a block door that moved to its owner, and the settings keys that
+declared it.
+
+### BREAKING — block enforcement is stapel-chat's, and only stapel-chat's
+
+**The defect was two axes for one fact in one deployment.** This package
+carried `STAPEL_CLASSIFIED["BLOCK_ENFORCEMENT"]` while its own preset set
+`STAPEL_CHAT["BLOCK_ENFORCEMENT"] = "required"`. An operator turned one
+switch, the other stayed where it was, and behaviour was decided by the one
+they had never heard of. That is not a disagreement between two libraries —
+both agree on the posture — it is one fact with two addresses.
+
+stapel-chat 0.6.1 holds **both** write doors a block has to close: opening a
+direct thread (`create_direct`) and sending into one. That is the single point
+every client passes. This composite could only ever guard its own
+`POST conversations`, and it could never touch the send path at all. chat
+0.6.1's changelog wrote the promise down — the pre-creation door here "is
+deleted by its next patch now that this has shipped" — and MODULE.md ask #5
+held the duplication explicitly until then. This is that release.
+
+**Deleted:**
+
+- `stapel_classified/blocks.py` — the whole module (`blocked_pairs`,
+  `is_blocked`, `provider_unreachable_reason`, the `ENFORCEMENT_*` vocabulary,
+  and the `BlockCheckUnavailable` re-export);
+- `STAPEL_CLASSIFIED["BLOCK_ENFORCEMENT"]` and
+  `STAPEL_CLASSIFIED["BLOCK_FUNCTION"]` from `conf.DEFAULTS`, and both axes
+  from `docs/capabilities.json`;
+- `checks.check_block_enforcement` (`E001` / `E002` / `W001` / `W002`) — chat
+  announces the same three states as `chat.E018` / `E017` / `W004` / `W003`;
+- the block call and `services.ContactRefused` in
+  `confirm_listing_conversation`, its 403 handler in `views.py`, and the error
+  keys `error.403.classified_contact_refused` and
+  `error.503.classified_blocks_unavailable` with their `ru`/`es` catalogues.
+
+**What replaces it is one statement, on the owner's axis:**
+`preset.SETTINGS_DEFAULTS["STAPEL_CHAT"]["BLOCK_ENFORCEMENT"] = "required"`,
+unchanged and now unduplicated. chat's own default is `auto` — right for a
+generic messaging module that may ship without stapel-profiles; a classified
+marketplace runs profiles and blocks between trading strangers are the point,
+so the composite raises the floor. Product knowledge as a VALUE, not as a
+second axis.
+
+### Why the deleted check was wrong, not merely redundant
+
+`confirm_listing_conversation` takes a `conversation_id`: it only ever runs on
+a thread that **already exists**. By this fleet's own doctrine an existing
+thread is history, and reading history must not consult the block provider.
+Until now this endpoint answered `503 classified_blocks_unavailable` when the
+provider was down — an outage standing between a person and their own
+correspondence, which is precisely what chat 0.6.1 engineered away by
+consulting the provider on the create branch only. `tests/test_blocks.py::
+test_confirm_still_answers_200_while_the_provider_is_down` pins it.
+
+### The bridge — `stapel_classified.E003`, "this key moved to STAPEL_CHAT"
+
+`AppSettings` does **not** complain about a dead key inside a namespace dict
+(its `conf_checks` only see environment variables). So a deployment left with
+`STAPEL_CLASSIFIED = {"BLOCK_ENFORCEMENT": "off"}` would silently inherit
+chat's `auto` after upgrading: a posture somebody chose on purpose would just
+stop applying. Either moved key now raises an **Error** at boot naming its new
+address.
+
+### Migration
+
+1. Move any `BLOCK_ENFORCEMENT` / `BLOCK_FUNCTION` you set under
+   `STAPEL_CLASSIFIED` to `STAPEL_CHAT`, and delete them here. `manage.py
+   check` refuses to boot with `stapel_classified.E003` until you do, hint
+   included. A deployment that set neither has nothing to do: the preset
+   already arms `required`.
+2. Stop handling `error.403.classified_contact_refused` and
+   `error.503.classified_blocks_unavailable` in clients — they are gone.
+   chat's `error.403.chat_send_refused` (403, naming no block, no direction)
+   and `error.503.chat_blocks_unavailable` are the whole refusal vocabulary
+   now, and they arrive from chat's surface. `docs/frontend-contract.md` §5
+   and §6 are updated.
+3. **`stapel-chat>=0.6.1` is load-bearing, not hygiene.** Against 0.6.0 this
+   deletion re-opens the hole ask #5 named: a blocked buyer's empty thread
+   arriving in the blocker's inbox. The floor is declared in
+   `pyproject.toml` and a resolver cannot land you below it.
+
+The shipped pytest harness (`stapel_classified.testing`, `pytest11`) **stays**
+— it is not duplicated enforcement, it is test infrastructure for a fact
+profiles owns and chat enforces. Re-targeted: the Function name comes from
+`STAPEL_CHAT["BLOCK_FUNCTION"]` and `BlockStore.is_blocked` goes through
+`stapel_chat.blocks.is_blocked`. Fixture names and behaviour are unchanged.
+
+### Fixed — the composite pinned its fleet to a geo that cannot serve a map
+
+`stapel-geo>=0.2,<0.4` kept every deployment of this composite below 0.4.0,
+which is where the server half of the location picker lives: `GET
+/geo/api/v1/map/config` (the one call the picker must have) and
+`geocoding/resolve`. The visible consequence in a live classified product was
+a listing composer with **two raw fields, `latitude` and `longitude`** —
+because that is all a product can offer when the geo it is allowed to install
+returns coordinates and nothing else.
+
+The cap is now `<0.5`. Nothing in this package imports `stapel_geo`; the
+preset only names it in `INSTALLED_APPS` and mounts its URLs
+(`preset.py:25,52`), and the test suite deliberately does not install it at
+all (`conftest.py:18`). The declared range was the entire coupling, and it was
+raised without a comment saying why it was there — unlike the caps beside it.
+
+stapel-geo 0.4.0 also fixes `lang=ru` silently returning English addresses,
+which the same fleet was living with.
+
 ## 0.3.3 — 2026-08-26
 
 ### Fixed — the shipped pytest plugin registered itself twice

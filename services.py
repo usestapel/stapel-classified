@@ -28,9 +28,7 @@ logger = logging.getLogger(__name__)
 SUBJECT_TYPE_LISTING = "listing"
 
 #: What chat calls a two-party thread. A group room can carry a subject too,
-#: and the header renders one; the block check below is about opening a
-#: DIRECT conversation with a seller, which is the only contact this module
-#: knows how to refuse.
+#: and the header renders one.
 KIND_DIRECT = "direct"
 
 #: Why a header is degraded. The subject's key names a listing whose owner is
@@ -59,10 +57,6 @@ class NotAParty(ClassifiedError):
 
 class OwnListing(ClassifiedError):
     """A seller cannot open a buyer conversation with themselves (400)."""
-
-
-class ContactRefused(ClassifiedError):
-    """A block stands between the two parties (403)."""
 
 
 class ChatUnavailable(ClassifiedError):
@@ -141,15 +135,21 @@ def confirm_listing_conversation(
     - the caller is not its seller (contacting yourself is not contact);
     - chat agrees the thread exists, that the caller is in it, and that its
       subject really is that listing — the "a binding is a claim by the person
-      who makes it" limitation of 0.3.x, closed;
-    - and no block stands between the two parties.
+      who makes it" limitation of 0.3.x, closed.
+
+    **No block check, since 0.4.0.** It used to be here, and it was in the
+    wrong place twice over. stapel-chat 0.6.1 refuses a blocked pair the
+    THREAD, at `create_direct` — the one point every client passes, and the
+    door this composite could only guard on its own endpoint. And this verb
+    takes a `conversation_id`: it only ever runs on a thread that already
+    exists, which is history, and reading history must not consult the block
+    provider. Answering 503 here while the provider was down put an outage
+    between a person and their own correspondence.
 
     Order is deliberate and unchanged: the listing first (it produces the 404
-    and names the seller), self-contact next (cheap, and a block check against
-    yourself is meaningless), then chat, then the block — the two that can be
-    remote calls and the two that can answer 503, last.
+    and names the seller), self-contact next, then chat — the one that can be
+    a remote call and the one that can answer 503, last.
     """
-    from . import blocks
     from .cards import STATE_GONE, listing_cards
 
     key = str(listing_key)
@@ -178,9 +178,6 @@ def confirm_listing_conversation(
         or str(thread.get("subject_key") or "") != key
     ):
         raise ConversationNotBound(cid)
-
-    if blocks.is_blocked(actor_id, seller_id):
-        raise ContactRefused(key)
 
     return conversation_context(cid, viewer_id=actor_id)
 
@@ -281,7 +278,6 @@ __all__ = [
     "SUBJECT_TYPE_LISTING",
     "ChatUnavailable",
     "ClassifiedError",
-    "ContactRefused",
     "ConversationNotBound",
     "NotAParty",
     "OwnListing",

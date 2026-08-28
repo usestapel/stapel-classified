@@ -108,9 +108,7 @@ Refusals:
 |---|---|---|
 | `400` | `error.400.classified_own_listing` | Hide the button on your own listing; this is the belt-and-braces case. |
 | `404` | `error.404.classified_listing_not_found` | The listing was deleted between page load and click. Say so; do not open an empty chat. |
-| `403` | `error.403.classified_contact_refused` | "This seller cannot be contacted." **Do not** say "you are blocked" or "they blocked you" — the server deliberately does not tell you which, and neither should the UI (§6). |
 | `404` | `error.404.classified_conversation_not_found` | Chat has no such thread, you are not in it, or its subject is a different listing. Same answer for all three, on purpose (§2.2). |
-| `503` | `error.503.classified_blocks_unavailable` | Retryable. The block store could not be asked, and the server refuses rather than guessing. Offer "try again". |
 | `503` | `error.503.classified_chat_unavailable` | Retryable. Chat could not be asked who is in the thread. **Never render an empty header as "no subject"** — that is a different fact. |
 
 ### 2.2 `GET /classified/api/v1/conversations/{conversation_id}` — one header
@@ -380,25 +378,30 @@ UI rules:
   conversation from the list; mark it.
 - **Never disclose direction.** The refusal does not say who blocked whom,
   and the copy must not either.
-- **The server enforces it now — stop treating the UI as the guarantee.**
-  stapel-chat 0.6.0 checks the same block on **every send** (403
-  `error.403.chat_send_refused`), and this composite checks it when a contact
-  is opened (§2.1, 403). Hiding the composer is a courtesy so a user does not
-  type into a refusal; it is no longer the enforcement, and a client that
+- **The server enforces it, and the server is stapel-chat — one door, not
+  two.** chat refuses a blocked pair the THREAD at creation (0.6.1) and every
+  SEND (0.6.0), both with 403 `error.403.chat_send_refused`. This composite
+  stopped checking in 0.4.0: its own `POST conversations` refusal
+  (`error.403.classified_contact_refused`) and its 503
+  (`error.503.classified_blocks_unavailable`) are **gone**, and a client must
+  no longer handle either key. Hiding the composer is a courtesy so a user
+  does not type into a refusal; it is not the enforcement, and a client that
   skips it changes nothing about what the server allows.
-- **A 503 from either check is not "allowed".** `classified_blocks_unavailable`
-  and chat's `chat_blocks_unavailable` both mean the block store could not be
+- **A 503 from the check is not "allowed".** chat's
+  `error.503.chat_blocks_unavailable` means the block store could not be
   asked. Offer a retry; never fall through to sending.
+- **An outage never hides a thread you already have.** chat asks the block
+  provider only when a thread is being CREATED, and `POST
+  /classified/api/v1/conversations` asks it not at all — so a block-store
+  outage cannot stand between somebody and their own correspondence.
 
 ## 6. Failure vocabulary, in one place
 
 | Status | Key | Retryable | Copy |
 |---|---|---|---|
 | 400 | `error.400.classified_own_listing` | no | "This is your own listing" |
-| 403 | `error.403.classified_contact_refused` | no | "This seller cannot be contacted" |
 | 404 | `error.404.classified_listing_not_found` | no | "This listing no longer exists" |
 | 404 | `error.404.classified_conversation_not_found` | no | render the chat with no header |
-| 503 | `error.503.classified_blocks_unavailable` | **yes** | "Try again in a moment" |
 | 503 | `error.503.classified_chat_unavailable` | **yes** | "Try again in a moment" — and never as "no header": chat could not be asked at all |
 
 Every error body is core's envelope: `{"localizable_error": "<key>", …}`.

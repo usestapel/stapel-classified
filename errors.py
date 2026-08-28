@@ -14,12 +14,12 @@ ERR_404_CONVERSATION_NOT_FOUND = "error.404.classified_conversation_not_found"
 ERR_400_OWN_LISTING = "error.400.classified_own_listing"
 
 # ── Contact ──────────────────────────────────────────────────────────
-#: Deliberately unspecific. A blocked user is told the seller cannot be
-#: contacted, never that they were blocked or by whom: naming the block turns
-#: a quiet boundary into a notification, and a marketplace's block exists
-#: precisely so the other person stops receiving anything.
-ERR_403_CONTACT_REFUSED = "error.403.classified_contact_refused"
-ERR_503_BLOCKS_UNAVAILABLE = "error.503.classified_blocks_unavailable"
+# No block key here since 0.4.0. A blocked pair is refused by stapel-chat, at
+# the door it owns (`create_direct` -> `error.403.chat_send_refused`, and
+# `error.503.chat_blocks_unavailable` when the provider is present and
+# failing). Two keys for one refusal would let a client tell "refused to open"
+# from "refused to send", which is itself the disclosure non-disclosure exists
+# to prevent.
 
 # ── The conversation itself ──────────────────────────────────────────
 #: Chat owns both halves of a conversation header's provenance (who is in the
@@ -32,8 +32,6 @@ STAPEL_CLASSIFIED_ERRORS = {
     ERR_404_LISTING_NOT_FOUND: "This listing no longer exists",
     ERR_404_CONVERSATION_NOT_FOUND: "Conversation not found",
     ERR_400_OWN_LISTING: "You cannot start a buyer conversation on your own listing",
-    ERR_403_CONTACT_REFUSED: "This seller cannot be contacted",
-    ERR_503_BLOCKS_UNAVAILABLE: "Contacts are temporarily unavailable, try again shortly",
     ERR_503_CHAT_UNAVAILABLE: "Conversations are temporarily unavailable, try again shortly",
 }
 
@@ -42,8 +40,6 @@ STAPEL_CLASSIFIED_REMEDIATION = {
     ERR_404_LISTING_NOT_FOUND: "verify",
     ERR_404_CONVERSATION_NOT_FOUND: "verify",
     ERR_400_OWN_LISTING: "fix_input",
-    ERR_403_CONTACT_REFUSED: "contact_support",
-    ERR_503_BLOCKS_UNAVAILABLE: "wait_and_retry",
     ERR_503_CHAT_UNAVAILABLE: "wait_and_retry",
 }
 

@@ -202,14 +202,6 @@
     "owner": "stapel_core"
   },
   {
-    "code": "error.403.classified_contact_refused",
-    "status": 403,
-    "params": [],
-    "remediation": "contact_support",
-    "en": "This seller cannot be contacted",
-    "owner": "stapel_classified"
-  },
-  {
     "code": "error.403.forbidden",
     "status": 403,
     "params": [],
@@ -386,14 +378,6 @@
     "remediation": "contact_support",
     "en": "Something went wrong",
     "owner": "stapel_core"
-  },
-  {
-    "code": "error.503.classified_blocks_unavailable",
-    "status": 503,
-    "params": [],
-    "remediation": "wait_and_retry",
-    "en": "Contacts are temporarily unavailable, try again shortly",
-    "owner": "stapel_classified"
   },
   {
     "code": "error.503.classified_chat_unavailable",

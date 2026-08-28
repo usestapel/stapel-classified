@@ -17,13 +17,12 @@ def main(argv=None):
     from stapel_classified.conf import DEFAULTS
     from stapel_classified.urls_v1 import GATE_REGISTRY
 
-    # The axes that change WHAT THE PRODUCT DOES to its users: whether a
-    # block is enforced at all, and which providers answer the questions a
-    # conversation header asks. Batch limits and timeouts are tuning — they
-    # bound cost, they do not change the deal with anybody.
+    # The axes that change WHAT THE PRODUCT DOES to its users: which
+    # providers answer the questions a conversation header asks. Batch limits
+    # and timeouts are tuning — they bound cost, they do not change the deal
+    # with anybody. Block enforcement is not here since 0.4.0: it is
+    # STAPEL_CHAT's axis, and it appears in stapel-chat's capabilities.
     axes = {
-        "BLOCK_ENFORCEMENT",
-        "BLOCK_FUNCTION",
         # An axis rather than tuning: it names WHO answers "is this person in
         # that thread", which is the authorization every read here hangs off.
         "CONVERSATION_PARTICIPANTS_FUNCTION",
@@ -39,8 +38,6 @@ def main(argv=None):
         is_axis=lambda k: k in axes,
         axis_group=axis_group_rules(
             exact={
-                "BLOCK_ENFORCEMENT": "classified.blocks",
-                "BLOCK_FUNCTION": "classified.blocks",
                 "CONVERSATION_PARTICIPANTS_FUNCTION": "classified.conversations",
                 "PUBLIC_PROFILE_FUNCTION": "classified.cards",
                 "SELLER_RATING_TARGET_TYPE": "classified.cards",

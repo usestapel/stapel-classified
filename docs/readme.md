@@ -46,7 +46,7 @@ contribute only the `v1/` segment and belong under `<mod>/api/`, while
 | `STAPEL_REVIEWS["TARGET_TYPES"]` | prefilled by the preset (targets `listing`) |
 | `STAPEL_SEARCH["SOURCES"]` | prefilled by the preset (the `listing` source) |
 | `STAPEL_MODERATION["TARGET_TYPES"]` | prefilled by the preset (`listing` pre-publication, `review`/`seller`/`chat_message` post) |
-| `STAPEL_CLASSIFIED["BLOCK_ENFORCEMENT"]` | `auto` — enforced where a block provider answers, and `manage.py check` says at every boot which state you are in. Set `required` once one does. |
+| `STAPEL_CHAT["BLOCK_ENFORCEMENT"]` | prefilled `required` by the preset — the ONE block switch, and it is stapel-chat's. Chat holds both doors (opening a direct thread, sending into one) and says at every boot which state you are in. A key of this name under `STAPEL_CLASSIFIED` moved here in 0.4.0 and is a boot error (`stapel_classified.E003`). |
 | `STAPEL_ACCESS["ROLES"]` | **yours** — the moderation console is staff-only; `preset.RECOMMENDED_ACCESS_ROLES` shows the shape |
 | `STAPEL_GDPR["DATA_OWNERS"]` | **yours** — must list `"moderation"`, or erasure never closes over complaint data |
 | `STAPEL_MODERATION["APPEAL_URL_TEMPLATE"]` | **yours** — an empty appeal link is what DSA Art. 17 notices |

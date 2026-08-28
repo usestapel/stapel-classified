@@ -8,7 +8,7 @@
     "/classified/api/v1/conversations": {
       "post": {
         "operationId": "classified_api_v1_conversations_create",
-        "description": "Confirm a contact about a listing, and answer the header to render.\n\n**200, not 201**: since 0.3.2 this creates nothing. The thread is chat's\nand carries its own subject; what happens here is the check no other\nmodule in the fleet can make — the listing exists, the caller is not its\nseller, chat agrees the caller is in that thread and that it really is\nabout that listing, and no block stands between the two parties.\n\n**Permissions:** `IsNotAnonymousUser`",
+        "description": "Confirm a contact about a listing, and answer the header to render.\n\n**200, not 201**: since 0.3.2 this creates nothing. The thread is chat's\nand carries its own subject; what happens here is the check no other\nmodule in the fleet can make — the listing exists, the caller is not its\nseller, and chat agrees the caller is in that thread and that it really is\nabout that listing.\n\nA blocked pair never reaches this endpoint: chat refuses them the thread\nat `create_direct` (0.6.1). A pair that already HAS a thread is confirmed\nhere even while the block provider is down — that is a read of history,\nand the composite stopped putting an outage in front of one in 0.4.0.\n\n**Permissions:** `IsNotAnonymousUser`",
         "tags": [
           "Classified / conversations"
         ],

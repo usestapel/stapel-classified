@@ -18,13 +18,11 @@ from stapel_core.django.api.errors import StapelErrorResponse, StapelResponse
 from stapel_core.django.api.permissions import ANONYMOUS_DENIED, IsNotAnonymousUser
 from stapel_core.django.api.views import StapelAPIView
 
-from . import blocks, services
+from . import services
 from .errors import (
     ERR_400_OWN_LISTING,
-    ERR_403_CONTACT_REFUSED,
     ERR_404_CONVERSATION_NOT_FOUND,
     ERR_404_LISTING_NOT_FOUND,
-    ERR_503_BLOCKS_UNAVAILABLE,
     ERR_503_CHAT_UNAVAILABLE,
 )
 from .serializers import (
@@ -52,12 +50,6 @@ def _maps_errors(handler):
             return StapelErrorResponse(503, ERR_503_CHAT_UNAVAILABLE)
         except services.OwnListing:
             return StapelErrorResponse(400, ERR_400_OWN_LISTING)
-        except services.ContactRefused:
-            return StapelErrorResponse(403, ERR_403_CONTACT_REFUSED)
-        except blocks.BlockCheckUnavailable:
-            # The block store is configured and could not be asked. 503, never
-            # a quiet "allowed": an outage is not consent.
-            return StapelErrorResponse(503, ERR_503_BLOCKS_UNAVAILABLE)
 
     return wrapper
 
@@ -69,8 +61,13 @@ class ConversationConfirmView(StapelAPIView):
     **200, not 201**: since 0.3.2 this creates nothing. The thread is chat's
     and carries its own subject; what happens here is the check no other
     module in the fleet can make — the listing exists, the caller is not its
-    seller, chat agrees the caller is in that thread and that it really is
-    about that listing, and no block stands between the two parties.
+    seller, and chat agrees the caller is in that thread and that it really is
+    about that listing.
+
+    A blocked pair never reaches this endpoint: chat refuses them the thread
+    at `create_direct` (0.6.1). A pair that already HAS a thread is confirmed
+    here even while the block provider is down — that is a read of history,
+    and the composite stopped putting an outage in front of one in 0.4.0.
     """
 
     permission_classes = [IsNotAnonymousUser]

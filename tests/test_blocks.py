@@ -1,22 +1,29 @@
-"""Blocking, enforced at the server — and the three states it can be in.
+"""Blocking across the composite stack — one door, and it is stapel-chat's.
 
 The block itself is stapel-profiles' (``UserRelationship``, status
 ``blocked``); since profiles 0.16.0 a server can consult it through
-``profiles.relationships``, and this composite asks at the one place a
-classified contact begins. These tests pin the posture axis, what each state
-does, and the one thing that must never happen (an outage reading as consent).
+``profiles.relationships``; and since stapel-chat 0.6.1 chat holds **both**
+write doors a block has to close — opening a direct thread and sending into
+one. This composite kept a pre-creation door of its own until 0.4.0 and no
+longer does: what it keeps is one statement of product knowledge, the value
+``STAPEL_CHAT["BLOCK_ENFORCEMENT"] = "required"`` in its preset.
+
+So this file stopped asserting a posture of this package's own. It asserts
+that the assembled composite ARMS chat's axis, and that the refusal lands
+where chat puts it. Two axes for one fact was the defect: an operator turned
+the one they knew about, the other stayed where it was, and behaviour was
+decided by the one they had never heard of.
 
 **Nothing here is a double.** stapel_profiles is mounted in this harness, so a
 block is a real relationship row and the answer comes from profiles' real
-provider. Through 0.3.1 this file registered its own ``profiles.relationships``
-and asserted against it — a suite proving that its own fixture agreed with
-itself, which is precisely the seam defect the fleet keeps shipping. The
-default posture is ``required``, so a suite that could not reach a real
-provider was not testing this module's default at all.
+provider — see the root conftest for why a suite that mocked either side of a
+seam would prove nothing about it.
 """
 import pytest
+from stapel_chat.blocks import BlockCheckUnavailable
+from stapel_chat.services import SendRefused
 
-from stapel_classified import blocks, services
+from stapel_classified import preset, services
 
 pytestmark = pytest.mark.django_db
 
@@ -29,22 +36,43 @@ def _contact(conversation, listing, actor):
     )
 
 
-# ── required: the state a deployment with profiles is in ─────────────
+def _confirm_over_http(client_for, actor, conversation, listing):
+    return client_for(actor).post(
+        "/classified/api/v1/conversations",
+        {
+            "conversation_id": str(conversation.id),
+            "listing_id": str(listing.pk),
+        },
+        format="json",
+    )
 
 
-def test_with_a_provider_a_block_refuses_contact(
+# ── required: the state this composite's preset puts a deployment in ──
+
+
+def test_a_block_refuses_the_thread_through_the_composite_stack(
     published_listing, other_user, user, thread, block
 ):
+    """The refusal in its new place.
+
+    Through 0.3.x this raised ``services.ContactRefused`` from this package's
+    own contact endpoint — a door that only covered clients which used it,
+    and which could never cover the send path. chat 0.6.1 refuses at
+    ``create_direct``, the one point every client passes, so a blocked buyer
+    now never gets the thread at all.
+    """
     block(user, other_user)  # the seller blocked the buyer
 
-    with pytest.raises(services.ContactRefused):
-        _contact(thread(other_user, user, published_listing), published_listing, other_user)
+    with pytest.raises(SendRefused):
+        thread(other_user, user, published_listing)
 
 
 def test_the_block_bites_in_either_direction(published_listing, other_user, user, block):
     """A seller who blocked a buyer and a buyer who blocked a seller produce
     the same silence. Direction is stored (one row, one author) and never
     answered: naming the block turns a quiet boundary into a notification."""
+    from stapel_chat import blocks
+
     block(user, other_user)
     assert blocks.is_blocked(other_user.pk, user.pk)
     assert blocks.is_blocked(user.pk, other_user.pk)
@@ -58,10 +86,10 @@ def test_an_unblocked_pair_is_let_through(published_listing, other_user, user, t
     assert context["viewer_role"] == "buyer"
 
 
-# ── the failure that must not be silent ──────────────────────────────
+# ── the failure that must not be silent, and the read it must not block ──
 
 
-def test_a_provider_that_fails_answers_503_not_allowed(
+def test_a_new_thread_is_refused_while_the_provider_is_down(
     published_listing, other_user, user, thread, blocks_down
 ):
     """An outage is not consent.
@@ -69,128 +97,120 @@ def test_a_provider_that_fails_answers_503_not_allowed(
     A registered provider that raises is the one case where "let them
     through" would be indistinguishable from "nobody blocked anybody" — and
     it is exactly the shape that made a live product poll for months while
-    its sockets were "done".
+    its sockets were "done". chat answers 503 on its own surface.
     """
-    with pytest.raises(blocks.BlockCheckUnavailable):
-        _contact(thread(other_user, user, published_listing), published_listing, other_user)
+    with pytest.raises(BlockCheckUnavailable):
+        thread(other_user, user, published_listing)
 
 
-def test_the_api_turns_that_into_a_503(
-    published_listing, other_user, user, thread, client_for, blocks_down
+def test_confirm_still_answers_200_while_the_provider_is_down(
+    published_listing, other_user, user, thread, client_for, block_provider
 ):
+    """The test that pins the deletion.
+
+    ``confirm_listing_conversation`` takes a ``conversation_id``: it only ever
+    runs on a thread that ALREADY EXISTS, which is history. Until 0.4.0 this
+    package asked the block provider here anyway and answered 503 when it was
+    down — an outage standing between a person and their own correspondence,
+    which is precisely what chat 0.6.1 engineered away by consulting the
+    provider on the create branch only. The check was not redundant, it was
+    doctrinally wrong, and it is gone.
+    """
     conversation = thread(other_user, user, published_listing)
-    response = client_for(other_user).post(
-        "/classified/api/v1/conversations",
-        {
-            "conversation_id": str(conversation.id),
-            "listing_id": str(published_listing.pk),
-        },
-        format="json",
+    block_provider.set_unavailable(True)
+
+    response = _confirm_over_http(
+        client_for, other_user, conversation, published_listing
     )
-    assert response.status_code == 503
-    assert response.data["localizable_error"] == "error.503.classified_blocks_unavailable"
+    assert response.status_code == 200
+    assert response.data["subject"]["key"] == str(published_listing.pk)
 
 
-def test_the_api_refusal_does_not_say_who_blocked_whom(
+def test_confirm_does_not_refuse_a_blocked_pair_that_already_has_history(
     published_listing, other_user, user, thread, client_for, block
 ):
-    block(user, other_user)
+    """A block refuses NEW contact; it never takes back what was already said.
+
+    The thread exists, then one of them blocks the other. Reading the header
+    of that thread — which is all this endpoint does — keeps working for both
+    sides. Neither can add to it: chat's send path still refuses.
+    """
     conversation = thread(other_user, user, published_listing)
-    response = client_for(other_user).post(
-        "/classified/api/v1/conversations",
-        {
-            "conversation_id": str(conversation.id),
-            "listing_id": str(published_listing.pk),
-        },
-        format="json",
+    block(user, other_user)
+
+    response = _confirm_over_http(
+        client_for, other_user, conversation, published_listing
     )
-    assert response.status_code == 403
-    assert response.data["localizable_error"] == "error.403.classified_contact_refused"
-    body = str(response.data).lower()
-    assert "block" not in body
+    assert response.status_code == 200
 
 
-# ── auto / required / off ────────────────────────────────────────────
+# ── the posture, on the one axis that owns it ────────────────────────
 
 
-def test_with_no_provider_contact_proceeds_and_the_check_says_so(
-    settings, published_listing, other_user, user, thread, no_block_provider
+def test_the_preset_arms_chats_axis_and_that_is_the_only_statement():
+    """The composite's whole contribution to blocking, in one assertion.
+
+    chat's own default is ``auto``, right for a generic messaging module that
+    may ship without stapel-profiles. A classified marketplace runs profiles
+    and blocks between trading strangers are the point, so the composite
+    raises the floor — as a VALUE on chat's axis, never as an axis of its own.
+    """
+    from stapel_classified.conf import DEFAULTS
+
+    assert preset.SETTINGS_DEFAULTS["STAPEL_CHAT"]["BLOCK_ENFORCEMENT"] == "required"
+    assert not [key for key in DEFAULTS if key.startswith("BLOCK_")]
+
+
+def test_with_no_provider_contact_proceeds_and_chats_check_says_so(
+    settings, published_listing, other_user, user, thread, client_for,
+    no_block_provider,
 ):
-    """No provider registered: this deployment HAS no block store.
+    """``auto`` with no provider registered: this deployment HAS no block store.
 
     Refusing every contact instead would take a marketplace offline over a
-    module it chose not to deploy — so contact proceeds, and `manage.py check`
-    prints W001 at every boot. The rule is "never degrade SILENTLY", not
-    "never degrade". This is the ONE posture that has to be constructed now
-    (profiles is mounted), and constructing it is the honest way to assert it.
+    module it chose not to deploy — so a thread opens, the header renders, and
+    ``manage.py check`` prints chat's W003 at every boot. The rule is "never
+    degrade SILENTLY", not "never degrade".
     """
-    from stapel_classified.checks import check_block_enforcement
+    from stapel_chat.checks import check_block_enforcement
 
-    settings.STAPEL_CLASSIFIED = {"BLOCK_ENFORCEMENT": "auto"}
-    context = _contact(
-        thread(other_user, user, published_listing), published_listing, other_user
+    settings.STAPEL_CHAT = {
+        **preset.SETTINGS_DEFAULTS["STAPEL_CHAT"],
+        "BLOCK_ENFORCEMENT": "auto",
+    }
+    conversation = thread(other_user, user, published_listing)
+    response = _confirm_over_http(
+        client_for, other_user, conversation, published_listing
     )
-    assert context["subject"]["key"] == str(published_listing.pk)
-    assert [w.id for w in check_block_enforcement(None)] == ["stapel_classified.W001"]
+
+    assert response.status_code == 200
+    assert [w.id for w in check_block_enforcement(None)] == ["stapel_chat.W003"]
 
 
-def test_required_without_a_provider_is_a_boot_error(settings, no_block_provider):
-    from stapel_classified.checks import check_block_enforcement
+def test_a_block_key_left_in_this_namespace_is_a_boot_error(settings):
+    """E003 — the bridge that keeps the move from being silent.
 
-    settings.STAPEL_CLASSIFIED = {"BLOCK_ENFORCEMENT": "required"}
-    findings = check_block_enforcement(None)
-    assert [f.id for f in findings] == ["stapel_classified.E002"]
-
-
-def test_required_without_a_provider_refuses_contact_at_runtime(
-    published_listing, other_user, user, thread, settings, no_block_provider
-):
-    """Declared required and not there: 503, never a quiet pass."""
-    settings.STAPEL_CLASSIFIED = {"BLOCK_ENFORCEMENT": "required"}
-    with pytest.raises(blocks.BlockCheckUnavailable):
-        _contact(thread(other_user, user, published_listing), published_listing, other_user)
-
-
-def test_required_with_a_provider_is_clean(settings):
-    from stapel_classified.checks import check_block_enforcement
-
-    settings.STAPEL_CLASSIFIED = {"BLOCK_ENFORCEMENT": "required"}
-    assert check_block_enforcement(None) == []
-
-
-def test_required_is_the_default_and_this_harness_meets_it():
-    """The default posture, asserted against the real registry.
-
-    0.3.1 flipped the default to "required" and its release died here: with
-    no provider in the harness, most of the suite raised
-    ``BlockCheckUnavailable``. The fix was the harness, not the default —
-    which only means something if a test says the default is still required
-    and that this deployment satisfies it.
+    AppSettings does not complain about a dead key inside a namespace dict
+    (its conf_checks only see environment variables), so a deployment that
+    declared ``STAPEL_CLASSIFIED = {"BLOCK_ENFORCEMENT": "off"}`` would
+    silently inherit chat's ``auto`` after upgrading: a posture somebody chose
+    on purpose would just stop applying.
     """
-    from stapel_classified.conf import DEFAULTS, classified_settings
-
-    assert DEFAULTS["BLOCK_ENFORCEMENT"] == blocks.ENFORCEMENT_REQUIRED
-    assert classified_settings.BLOCK_ENFORCEMENT == blocks.ENFORCEMENT_REQUIRED
-    assert blocks.provider_unreachable_reason() == ""
-
-
-def test_off_is_a_disclosed_statement(published_listing, other_user, user, settings, block):
-    from stapel_classified.checks import check_block_enforcement
+    from stapel_classified.checks import check_block_keys_moved
 
     settings.STAPEL_CLASSIFIED = {"BLOCK_ENFORCEMENT": "off"}
-    block(user, other_user)
+    findings = check_block_keys_moved(None)
+    assert [f.id for f in findings] == ["stapel_classified.E003"]
+    # The hint names the new address, not just the fact of a move.
+    assert "STAPEL_CHAT['BLOCK_ENFORCEMENT']" in findings[0].msg
+    assert "STAPEL_CHAT['BLOCK_ENFORCEMENT']" in findings[0].hint
 
-    # It really is off — the block does not bite…
-    assert not blocks.is_blocked(other_user.pk, user.pk)
-    # …and the deployment is told, at every boot.
-    assert [w.id for w in check_block_enforcement(None)] == ["stapel_classified.W002"]
+    settings.STAPEL_CLASSIFIED = {"BLOCK_FUNCTION": "profiles.relationships"}
+    assert [f.id for f in check_block_keys_moved(None)] == ["stapel_classified.E003"]
 
-
-def test_an_unknown_posture_is_refused(settings):
-    from stapel_classified.checks import check_block_enforcement
-
-    settings.STAPEL_CLASSIFIED = {"BLOCK_ENFORCEMENT": "sometimes"}
-    assert [f.id for f in check_block_enforcement(None)] == ["stapel_classified.E001"]
+    # A namespace that moved on is clean, and so is one that was never set.
+    settings.STAPEL_CLASSIFIED = {"CONTEXT_BATCH_LIMIT": 10}
+    assert check_block_keys_moved(None) == []
 
 
 # ── what a block is NOT ──────────────────────────────────────────────
@@ -223,10 +243,11 @@ def test_the_shipped_fixtures_use_the_real_provider_where_profiles_is_mounted(
     """`stapel_classified.testing` picks the honest backend by itself.
 
     A deployment with profiles gets real `UserRelationship` rows; one without
-    gets a stated in-memory provider. The choice is not a preference — a suite
-    that mocked the module it is proving a seam against would prove nothing,
-    and a suite with no provider at all cannot run this module's default
-    posture.
+    gets a stated in-memory provider registered under
+    ``STAPEL_CHAT["BLOCK_FUNCTION"]``. The choice is not a preference — a
+    suite that mocked the module it is proving a seam against would prove
+    nothing, and a suite with no provider at all cannot run the posture the
+    preset sets.
     """
     from stapel_classified.testing import profiles_is_mounted
 
@@ -244,7 +265,7 @@ def test_the_memory_backend_answers_the_same_questions(
     frees the Function name first — core's registry allows exactly one
     provider per name, which is the same reason there are no doubles here.
     """
-    from stapel_classified import blocks
+    from stapel_chat import blocks
     from stapel_classified.testing import memory_block_provider
 
     with memory_block_provider() as store:
@@ -253,15 +274,15 @@ def test_the_memory_backend_answers_the_same_questions(
 
         store.block(user, other_user)
         assert blocks.is_blocked(other_user.pk, user.pk)  # either direction
-        with pytest.raises(services.ContactRefused):
-            _contact(thread(other_user, user, published_listing), published_listing, other_user)
+        with pytest.raises(SendRefused):
+            thread(other_user, user, published_listing)
 
         store.unblock(user, other_user)
         assert not blocks.is_blocked(other_user.pk, user.pk)
 
         # And an outage is still not consent.
         store.set_unavailable(True)
-        with pytest.raises(blocks.BlockCheckUnavailable):
+        with pytest.raises(BlockCheckUnavailable):
             blocks.is_blocked(other_user.pk, user.pk)
 
     # Unregistered on exit: the block store is the deployment's, not a test's.

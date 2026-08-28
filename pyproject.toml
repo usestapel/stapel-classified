@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.3.3"
+version = "0.4.0"
 description = "Composite: classified ads — the shop composite + geo + search + moderation"
 readme = "README.md"
 license = { text = "MIT" }
@@ -71,16 +71,27 @@ dependencies = [
     "stapel-shop>=0.2.3,<0.3",
     "stapel-categories>=0.5.6,<0.6",
     "stapel-listings>=0.5,<0.8",
-    "stapel-geo>=0.2,<0.4",
+    # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
+    # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
+    # cannot serve a map, so a listing composer has no choice but to ask a human for
+    # latitude and longitude. Nothing here imports stapel_geo — the preset only mounts
+    # it (preset.py:25,52) — so the range is the whole coupling.
+    "stapel-geo>=0.2,<0.5",
     "stapel-search>=0.2.2,<0.3",
     "stapel-moderation>=0.3,<0.4",
-    "stapel-chat>=0.6,<0.7",
+    # >=0.6.1 is LOAD-BEARING, not hygiene: 0.6.1 is where chat began
+    # refusing a blocked pair the THREAD at create_direct, and 0.4.0
+    # deleted this package's own pre-creation door on that promise.
+    # Against 0.6.0 the deletion re-opens the hole it covered — a blocked
+    # buyer's empty thread arriving in the blocker's inbox.
+    "stapel-chat>=0.6.1,<0.7",
 ]
 
 # The block harness this module ships (stapel_classified/testing.py). A
-# deployment that installs this composite inherits BLOCK_ENFORCEMENT="required"
-# and therefore needs a registered block provider in its OWN tests; making
-# every consumer invent one is how a default gets weakened instead of met.
+# deployment that installs this composite inherits
+# STAPEL_CHAT["BLOCK_ENFORCEMENT"]="required" from the preset and therefore
+# needs a registered block provider in its OWN tests; making every consumer
+# invent one is how a posture gets weakened instead of met.
 [project.entry-points.pytest11]
 stapel_classified = "stapel_classified.testing"
 

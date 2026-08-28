@@ -6,7 +6,9 @@ order per key: ``settings.STAPEL_CLASSIFIED`` dict -> flat Django setting of
 the same name -> environment variable -> default below.
 
 Every key here is either an **axis** (it changes what the module does) or a
-**comm Function name** (it changes WHOM the module asks). There is no
+**comm Function name** (it changes WHOM the module asks) — and a fact another
+module owns gets neither: block enforcement is stapel-chat's axis and this
+namespace stopped carrying a copy of it in 0.4.0. There is no
 registry in this namespace on purpose: the composite has exactly one subject
 type today (``listing``) and one consumer of it, and a merge-registry built
 before its second entry exists is a seam that documents itself and nothing
@@ -28,31 +30,15 @@ from stapel_core.conf import AppSettings
 #: DEFAULTS lets the capabilities emitter introspect axis keys/kinds without
 #: re-parsing the AppSettings() call.
 DEFAULTS = {
-    # ── Blocking (the only enforcement axis) ─────────────────────────
-    # A user-to-user block is stapel-profiles' primitive (UserRelationship,
-    # status "blocked"). This composite does not keep a second copy of it —
-    # §7 of the v2 verdicts forbids exactly that. It ASKS, at the one place a
-    # classified conversation begins.
-    #
-    #   "auto"     — enforce when the provider is registered; when it is not
-    #                registered at all, this deployment has no blocks and
-    #                contact proceeds. Never silent: `manage.py check` prints
-    #                W001 saying which of the two states you are in.
-    #   "required" — an unregistered provider is an ERROR at boot (E002).
-    #                The DEFAULT since stapel-profiles 0.16.0 serves
-    #                profiles.relationships; "auto" is for a deployment that
-    #                knowingly runs without a block provider.
-    #   "off"      — a disclosed statement; check prints W002.
-    #
-    # In every state EXCEPT "off", a provider that IS registered and then
-    # fails answers 503, never "allowed": an outage is not consent.
-    "BLOCK_ENFORCEMENT": "required",
-    # The comm Function that answers "is there a block between these two?".
-    # Shape asked for: {"pairs": [[a, b], ...]} ->
-    # {"blocked": [[a, b], ...]} listing the pairs where a block exists in
-    # EITHER direction. Routed upstream to stapel-profiles (see MODULE.md,
-    # "What this composite needs and nobody serves yet").
-    "BLOCK_FUNCTION": "profiles.relationships",
+    # ── Blocking is NOT an axis here ──────────────────────────────────
+    # There is deliberately no BLOCK_* key in this namespace. stapel-chat
+    # owns both write doors a block has to hold — opening a direct thread
+    # (0.6.1) and sending into one (0.6.0) — and reads them from
+    # STAPEL_CHAT. This composite states its product knowledge as a VALUE on
+    # that axis (`preset.SETTINGS_DEFAULTS["STAPEL_CHAT"]["BLOCK_ENFORCEMENT"]
+    # = "required"`), never as a second axis: two switches for one fact means
+    # an operator turns one and behaviour is decided by the other.
+    # `checks.E003` catches a deployment that still sets the old keys here.
 
     # ── The conversation ─────────────────────────────────────────────
     # Who is in a thread, and what it is about. stapel-chat >= 0.6.0 serves

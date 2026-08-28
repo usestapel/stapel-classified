@@ -61,7 +61,8 @@ that and neither can a catalogue.
   table is deleted and `previous_subjects` with it.
 - **`POST conversations` verifies, it does not record.** The listing exists,
   the caller is not its seller, chat agrees the caller is in that thread and
-  that its subject is that listing, no block stands. 200, and nothing written.
+  that its subject is that listing. 200, and nothing written. No block check
+  since 0.4.0 — the thread already exists, and that is history.
 - **A subject whose owner is not in the thread is RENDERED, not refused**
   (`subject.meta_status: partial`, `meta_reason: subject_owner_not_a_party`).
   Chat cannot refuse it (it may not know what a listing is) and a 404 here
@@ -87,36 +88,61 @@ skins build against, endpoint by endpoint and field by field.
 ## Blocking
 
 The block belongs to **stapel-profiles** (`UserRelationship`, status
-`blocked`) and this composite keeps no copy of one. What it adds is that the
-block HOLDS on the server, at the one place a classified contact begins
-(`POST conversations` → 403). `BLOCK_ENFORCEMENT` is an axis with three
-states and the deployment is told at every boot which one it is in
-(`classified.W001` / `E002` / `W002`) — the rule is "never degrade
-*silently*", which is stapel-chat's lesson, not "never degrade". A provider
-that is present and FAILS answers 503, never "allowed": an outage is not
-consent.
+`blocked`) and this composite keeps no copy of one — and since **0.4.0** it
+keeps no enforcement of one either.
+
+**One door, and it is stapel-chat's.** chat 0.6.1 holds both write doors a
+block has to close: opening a direct thread (`create_direct`) and sending
+into one. That is the one point every client passes, which a composite
+endpoint never was — this package could only guard `POST conversations`, and
+it could never touch the send path at all. `BLOCK_ENFORCEMENT` is chat's
+axis, chat announces all three of its states at every boot (`chat.W003` /
+`E017` / `W004`), and a provider that is present and FAILS answers 503, never
+"allowed": an outage is not consent.
+
+**What this composite says about blocking is one value on that axis.**
+`preset.SETTINGS_DEFAULTS["STAPEL_CHAT"]["BLOCK_ENFORCEMENT"] = "required"`.
+chat's own default is `auto`, right for a generic messaging module that may
+ship without stapel-profiles; a classified marketplace runs profiles and
+blocks between trading strangers are the point, so the composite raises the
+floor. That is product knowledge expressed as a VALUE, not as a second axis —
+two switches for one fact is how an operator turns the one they know about
+and gets behaviour from the one they do not.
+
+**Deleted in 0.4.0**, on chat 0.6.1's own promise: `blocks.py`, the
+`BLOCK_ENFORCEMENT` / `BLOCK_FUNCTION` keys, `checks.check_block_enforcement`
+(E001/E002/W001/W002), `services.ContactRefused`, and the error keys
+`error.403.classified_contact_refused` /
+`error.503.classified_blocks_unavailable`. A deployment that still declares
+either moved key under `STAPEL_CLASSIFIED` is told at boot
+(`classified.E003`, an Error naming the new address), because AppSettings
+cannot see a dead key inside a namespace dict and a declared posture must not
+silently stop applying.
+
+The check was not merely redundant, it was doctrinally wrong by the end:
+`confirm_listing_conversation` takes a `conversation_id`, so it only ever
+runs on a thread that ALREADY EXISTS. That is history, and reading history
+must not consult the block provider — answering 503 there put an outage
+between a person and their own correspondence, which is exactly what chat
+0.6.1 engineered away by consulting the provider on the create branch only.
 
 Blocking never deletes a thread: both sides keep reading what was said, which
 is also how a report's evidence stays quotable.
 
-**Two enforcers, on purpose, and neither is redundant.** stapel-chat 0.6.0
-enforces the same `profiles.relationships` check on every SEND — which this
-composite could never do, because the send path is chat's. Chat does NOT check
-at `create_direct`, so the contact door here is what stops a blocked buyer
-from opening a thread at all. Until chat checks at creation too (routed
-below), removing either one leaves a hole: without chat's, a blocked pair
-keeps talking in a thread that already exists; without this one, a blocked
-buyer's empty thread appears in the blocker's inbox, and an unwanted arrival
-in an inbox is exactly what a block is for.
-
 ## Testing a deployment with blocks
 
-`BLOCK_ENFORCEMENT` defaults to **`required`**, so every test in a consuming
-project that touches a classified contact needs a REGISTERED
-`profiles.relationships` provider or it raises `BlockCheckUnavailable`. That
-is the default working. It is also a trap: 0.3.1's own publish job died with
-21 red tests for exactly this reason, and the tempting fix — weaken the
-default — is the wrong one every time.
+The preset sets `STAPEL_CHAT["BLOCK_ENFORCEMENT"] = "required"`, so every test
+in a consuming project that OPENS a classified conversation needs a REGISTERED
+`profiles.relationships` provider or `create_direct` raises
+`stapel_chat.blocks.BlockCheckUnavailable`. That is the posture working. It is
+also a trap: 0.3.1's own publish job died with 21 red tests for exactly this
+reason, and the tempting fix — weaken the posture — is the wrong one every
+time.
+
+The harness is not a second enforcer; it is test infrastructure for a fact
+**profiles** owns and **chat** enforces. Since 0.4.0 the Function name it
+registers under comes from `STAPEL_CHAT["BLOCK_FUNCTION"]`, which is the only
+key anything reads.
 
 So the harness ships WITH the module: **`stapel_classified.testing`**, a
 pytest plugin. Its `pytest11` entry point loads it for anyone who installs
@@ -126,15 +152,17 @@ entry-point name and a `pytest_plugins` entry under its module name, and the
 second one raises `Plugin already registered under a different name`).
 
 ```python
-def test_a_blocked_buyer_cannot_write(block_provider, buyer, seller):
+from stapel_chat.services import SendRefused
+
+def test_a_blocked_buyer_cannot_open_a_thread(block_provider, buyer, seller):
     block_provider.block(seller, buyer)          # direction as a person acts
-    with pytest.raises(services.ContactRefused):
-        ...
+    with pytest.raises(SendRefused):
+        create_direct(owner=buyer, other_user_id=seller.pk, ...)
 ```
 
 | Fixture | What it gives you |
 |---|---|
-| `block_provider` | A working block store, `.block(a, b)` / `.unblock(a, b)` / `.is_blocked(a, b)` / `.set_unavailable()`. Real `UserRelationship` rows where stapel-profiles is **mounted** (`.backend == "profiles"`), an explicit in-memory provider registered under `BLOCK_FUNCTION` otherwise (`"memory"`). |
+| `block_provider` | A working block store, `.block(a, b)` / `.unblock(a, b)` / `.is_blocked(a, b)` / `.set_unavailable()`. Real `UserRelationship` rows where stapel-profiles is **mounted** (`.backend == "profiles"`), an explicit in-memory provider registered under `STAPEL_CHAT["BLOCK_FUNCTION"]` otherwise (`"memory"`). |
 | `block` | `block(blocker, blocked)` — the shorthand. |
 | `blocks_down` | The provider is registered and FAILING: the 503 case. |
 | `no_block_provider` | No block store at all — the state `auto` exists for and `required` refuses to boot in. |
@@ -172,10 +200,12 @@ registry ships empty because `listing` belongs to whoever owns listings, and
 without the entry chat refuses `subject_type="listing"` outright (400
 `chat_unknown_subject_type`). Its `BLOCK_ENFORCEMENT` defaults to `auto`
 because a generic chat may ship without stapel-profiles; **this composite sets
-`required`** — the same posture its own namespace has carried since 0.3.1 —
-because a classified marketplace runs profiles and "blocks are not enforced
-here" must be a sentence an operator reads, not a default they inherit. A host
-that means it lowers either one knowingly.
+`required`** because a classified marketplace runs profiles and "blocks are
+not enforced here" must be a sentence an operator reads, not a default they
+inherit. Since 0.4.0 that value is the composite's ENTIRE statement about
+blocking — it used to be duplicated by an axis of the same name in
+`STAPEL_CLASSIFIED`, which is the two-switches-one-fact defect this release
+closed. A host that means it lowers either one knowingly, **there**.
 
 ### The `listing` search source
 
@@ -277,7 +307,7 @@ shape this composite's own tests fail on.
 Routed asks, written down so they are shapes to build against rather than
 gaps to paper over. Each has a working, honest behaviour in the meantime.
 
-### stapel-chat (0.6.0 — five asks shipped, one open)
+### stapel-chat (0.6.1 — all six asks shipped)
 
 1. ~~**A conversation subject.**~~ **Shipped in 0.6.0** — `subject_type` /
    `subject_key` plus a `SUBJECT_TYPES` merge registry with EMPTY built-ins,
@@ -291,14 +321,16 @@ gaps to paper over. Each has a working, honest behaviour in the meantime.
 4. ~~**`chat.conversation_participants`.**~~ **Shipped in 0.6.0 and adopted** —
    it is where the header's parties and every authorization on this surface
    come from now.
-5. **Block enforcement at CREATE, not only at send.** 0.6.0 enforces on every
-   send, which is the half this composite could never do. It does not check in
-   `create_direct`, so a blocked buyer can still open an empty thread that
-   lands in the blocker's inbox — an arrival is the thing a block exists to
-   stop. The ask is the same `blocked_pairs` call, once, before the create:
-   403 with a key that names no block, 503 when the provider is present and
-   failing. Until it lands, this composite's `POST conversations` is the only
-   create-time door in the fleet, and it only covers clients that use it.
+5. ~~**Block enforcement at CREATE, not only at send.**~~ **Shipped in
+   0.6.1, and the duplicate door here is deleted in 0.4.0.** It landed in the
+   shape written here — the same `blocked_pairs` call, once, on the create
+   branch only, refusing with `SendRefused` / `error.403.chat_send_refused`
+   (a key that names no block) and letting `BlockCheckUnavailable` travel to
+   503. It also brought the distinction this composite had not written down:
+   *returning* an existing thread is a read of history and asks the provider
+   nothing, so no block-store outage can stand between somebody and their own
+   correspondence. That is why the deletion here is a correction and not just
+   tidying — see "Blocking".
 6. ~~**`chat.moderation_content`.**~~ **Shipped in stapel-chat 0.5.0 and
    adopted in 0.3.0** — the ask is kept here, struck through, because the
    prediction it was written as ("one line of policy, no migration") is worth
@@ -309,9 +341,11 @@ gaps to paper over. Each has a working, honest behaviour in the meantime.
 
 1. **`profiles.relationships`** — `{"pairs": [[a, b], …]} -> {"blocked":
    [[a, b], …]}`, either direction. The block exists in the model and in the
-   REST API, and since profiles 0.16.0 a server can read it. `BLOCK_ENFORCEMENT`
-   therefore defaults to `required` (0.3.1): a deployment without a block
-   provider must say so with `auto`, not inherit a silent client-side block.
+   REST API, and since profiles 0.16.0 a server can read it. The composite's
+   preset therefore arms `STAPEL_CHAT["BLOCK_ENFORCEMENT"] = "required"`: a
+   deployment without a block provider must say so with `auto`, not inherit a
+   silent client-side block. The consumer of the Function is stapel-chat, on
+   both doors; this package calls it nowhere since 0.4.0.
 2. **`profiles.public_cards`** — `{user_ids} -> {profiles: {id: {display_name,
    avatar, member_since, seller_type}}}`. Until then the counterparty card is
    `partial` with `profile_unavailable`, and the frontend contract says to
@@ -355,7 +389,8 @@ mounts nothing.
   — plain data; a project copies or references them. Override per-project by
   editing the project's own settings, not this package.
 - `STAPEL_CLASSIFIED` (`conf.py`) — every read the header makes is a comm
-  Function NAME here, plus the block-enforcement axis. No registry: one
+  Function NAME here. No block axis: that one is `STAPEL_CHAT`'s and this
+  namespace stopped carrying a copy of it in 0.4.0. No registry either: one
   subject type and one consumer of it, and a merge-registry built before its
   second entry exists documents itself and nothing else.
 - `SerializerSeamMixin` / `StapelAPIView` (core's, hoisted in 0.37.0) on

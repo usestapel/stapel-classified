@@ -113,16 +113,16 @@ def test_system_checks_report_no_errors():
     # stopped firing would leave the same silence it was written to break.
     ids = {f.id for f in findings}
     assert "stapel_moderation.W006" in ids
-    # The block posture is enforced, not merely declared: no W001 ("no block
-    # store here"), no W002 ("blocks are off"), no E002 ("required and
-    # missing"). Both this composite and the chat the preset configures are
-    # asking a real provider.
+    # The block posture is enforced, not merely declared — and it is asserted
+    # on the ONE axis that owns it since 0.4.0: chat's. No W003 ("no block
+    # store here"), no W004 ("blocks are off"), no E017 ("required and
+    # missing"), because the preset arms `required` and profiles answers.
+    # And no E003: nothing in this host still declares the moved keys.
     assert not {
-        "stapel_classified.W001",
-        "stapel_classified.W002",
-        "stapel_classified.E002",
         "stapel_chat.W003",
         "stapel_chat.W004",
+        "stapel_chat.E017",
+        "stapel_classified.E003",
     } & ids
 
 

@@ -10,7 +10,7 @@
 [![license](https://img.shields.io/github/license/usestapel/stapel-classified)](https://github.com/usestapel/stapel-classified/blob/main/LICENSE)
 [![llms.txt](https://img.shields.io/badge/llms.txt-blue)](https://github.com/usestapel/stapel-classified/blob/main/docs/llms.txt)
 
-> Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies, the marketplace reason taxonomy, and (since 0.3.2) the `listing` subject type stapel-chat's registry ships empty of. Its own HTTP surface is a conversation HEADER, assembled from three modules that may not know about each other: chat says who is in the thread and what it is about, listings answers the short card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone` — exactly the answer a public read cannot give), profiles answers the counterparty. It owns NO table: the binding it kept from 0.2.0 to 0.3.1 existed only because chat could not tell two threads about two listings apart, and it was deleted rather than kept in sync the release chat could. It enforces a user-to-user block at the one place a classified contact begins, announcing at every boot whether that enforcement is live in this deployment.
+> Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies, the marketplace reason taxonomy, and (since 0.3.2) the `listing` subject type stapel-chat's registry ships empty of. Its own HTTP surface is a conversation HEADER, assembled from three modules that may not know about each other: chat says who is in the thread and what it is about, listings answers the short card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone` — exactly the answer a public read cannot give), profiles answers the counterparty. It owns NO table: the binding it kept from 0.2.0 to 0.3.1 existed only because chat could not tell two threads about two listings apart, and it was deleted rather than kept in sync the release chat could. It enforces no block of its own: stapel-chat 0.6.1 holds both write doors (opening a direct thread, sending into one) at the one point every client passes, and this composite's whole contribution is the value `required` it sets on chat's BLOCK_ENFORCEMENT axis in the preset. The pre-creation door it kept until 0.3.x was deleted in 0.4.0, and a deployment that still declares the old STAPEL_CLASSIFIED keys is told so at boot (E003) rather than silently inheriting chat's default.
 
 Part of the [Stapel framework](https://github.com/usestapel) — composable Django apps that deploy as a monolith or as microservices without changing module code.
 
@@ -24,13 +24,13 @@ pip install stapel-classified
 
 | Fact | Value |
 |---|---|
-| Version | `0.3.3` |
+| Version | `0.4.0` |
 | Python | `>=3.11` (3.11, 3.12, 3.13, 3.14) |
 | HTTP operations | 3 |
-| Config axes | 5 |
-| Usage surface | 10 |
+| Config axes | 3 |
+| Usage surface | 7 |
 | Extension points | 3 |
-| Error codes | 48 |
+| Error codes | 46 |
 | Fleet dependencies | [`stapel-attributes`](https://github.com/usestapel/stapel-attributes) · [`stapel-categories`](https://github.com/usestapel/stapel-categories) · [`stapel-cdn`](https://github.com/usestapel/stapel-cdn) (optional) · [`stapel-chat`](https://github.com/usestapel/stapel-chat) · [`stapel-geo`](https://github.com/usestapel/stapel-geo) · [`stapel-listings`](https://github.com/usestapel/stapel-listings) · [`stapel-moderation`](https://github.com/usestapel/stapel-moderation) · [`stapel-notifications`](https://github.com/usestapel/stapel-notifications) (optional) · [`stapel-profiles`](https://github.com/usestapel/stapel-profiles) (optional) · [`stapel-reviews`](https://github.com/usestapel/stapel-reviews) · [`stapel-search`](https://github.com/usestapel/stapel-search) |
 
 ## Documentation
@@ -85,7 +85,7 @@ contribute only the `v1/` segment and belong under `<mod>/api/`, while
 | `STAPEL_REVIEWS["TARGET_TYPES"]` | prefilled by the preset (targets `listing`) |
 | `STAPEL_SEARCH["SOURCES"]` | prefilled by the preset (the `listing` source) |
 | `STAPEL_MODERATION["TARGET_TYPES"]` | prefilled by the preset (`listing` pre-publication, `review`/`seller`/`chat_message` post) |
-| `STAPEL_CLASSIFIED["BLOCK_ENFORCEMENT"]` | `auto` — enforced where a block provider answers, and `manage.py check` says at every boot which state you are in. Set `required` once one does. |
+| `STAPEL_CHAT["BLOCK_ENFORCEMENT"]` | prefilled `required` by the preset — the ONE block switch, and it is stapel-chat's. Chat holds both doors (opening a direct thread, sending into one) and says at every boot which state you are in. A key of this name under `STAPEL_CLASSIFIED` moved here in 0.4.0 and is a boot error (`stapel_classified.E003`). |
 | `STAPEL_ACCESS["ROLES"]` | **yours** — the moderation console is staff-only; `preset.RECOMMENDED_ACCESS_ROLES` shows the shape |
 | `STAPEL_GDPR["DATA_OWNERS"]` | **yours** — must list `"moderation"`, or erasure never closes over complaint data |
 | `STAPEL_MODERATION["APPEAL_URL_TEMPLATE"]` | **yours** — an empty appeal link is what DSA Art. 17 notices |
