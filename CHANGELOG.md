@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.2 — 2026-08-30
+
+### The caps forbade the guest wall
+
+`stapel-listings>=0.8,<0.9` and `stapel-reviews>=0.2,<0.4` kept every fleet
+installing this composite below listings **0.9.0** and reviews **0.4.0** — the
+releases where `ALLOW_ANONYMOUS_WRITES` exists at all.
+
+A client fleet already declares
+`STAPEL_LISTINGS["ALLOW_ANONYMOUS_WRITES"] = False` and the reviews
+equivalent. On the versions these caps admit, no code reads that key: a guest
+is a real authenticated user, satisfies `IsAuthenticated`, and can create and
+publish a listing and leave a review. The wall is in the settings file and
+nowhere else. Confirmed against a running stand.
+
+pip refuses that resolution outright rather than warning, so the caps did not
+discourage the upgrade — they made it impossible, and this composite was one
+of two walls (the other is `stapel-shop`, which lifts its own in 0.2.6).
+`<0.10` and `<0.5` now, and **the floors move with the caps** — `>=0.9` and
+`>=0.4` — for the reason 0.4.1 moved the listings floor to 0.8: a deployment
+able to resolve back onto a version without the wall is a deployment whose
+declared wall does nothing.
+
+`stapel-shop`'s floor moves to 0.2.6 for the same reason. It carried the same
+caps, so a fleet resolving shop 0.2.5 would inherit `<0.9`/`<0.4` through it.
+
+Nothing in the composite changes shape. `search_sources.listing_source()`
+still reads `stapel_listings.models.INDEXED_STATUSES` by name and the header
+still reads `reviews.aggregate`; neither new release touches those. Full
+suite green against listings 0.9.0 + reviews 0.4.0 + shop 0.2.6 (125 passed).
+
 ## 0.4.1 — 2026-08-28
 
 ### The listings cap forbade the security fix
