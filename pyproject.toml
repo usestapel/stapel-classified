@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.4.2"
+version = "0.4.3"
 description = "Composite: classified ads — the shop composite + geo + search + moderation"
 readme = "README.md"
 license = { text = "MIT" }
@@ -97,7 +97,7 @@ dependencies = [
     # deleted this package's own pre-creation door on that promise.
     # Against 0.6.0 the deletion re-opens the hole it covered — a blocked
     # buyer's empty thread arriving in the blocker's inbox.
-    "stapel-chat>=0.6.1,<0.7",
+    "stapel-chat>=0.6.1,<0.8",
 ]
 
 # The block harness this module ships (stapel_classified/testing.py). A

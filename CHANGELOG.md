@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.4.3 — 2026-08-30
+
+### The cap forbade real presence
+
+`stapel-chat>=0.6.1,<0.7` kept every fleet installing this composite below
+chat **0.7.0** — the release where a conversation can say whether the OTHER
+participant is actually connected.
+
+Until it, a chat header drew "connected" from the READER's own websocket. In a
+classified marketplace that tag sat beside the seller's name and read as "the
+seller is online"; it never meant that. Fixing it needs `participants[].online`
+and `.last_seen_at`, and this cap is what stopped a deployment from having
+them: pip refuses the resolution outright rather than warning, so the cap did
+not discourage the upgrade, it made it impossible.
+
+`<0.8` now. **The floor deliberately does NOT move.** 0.4.2's floor moved with
+its cap because a deployment able to resolve back onto a version without the
+guest wall is a deployment whose declared wall does nothing — that reasoning
+does not apply here. Nothing in this composite reads presence, and the two
+functions it does read are untouched by 0.7.0:
+`chat.conversation_participants` (a conversation's parties and its subject)
+and `chat.moderation_content` (a reported message). `>=0.6.1` stays
+load-bearing for the reason it always was — 0.6.1 is where chat began refusing
+a blocked pair the THREAD at `create_direct`, and 0.4.0 deleted this package's
+own pre-creation door on that promise.
+
+Nothing in the composite changes shape, and there is no new key, seam or
+migration. Chat 0.7.0's two new participant fields are optional in the
+schema's `required` list, so a consumer still on 0.6.x reads a 0.7.0 body
+unchanged; its one new table is chat's own.
+
+Suite run against stapel-chat 0.7.0 installed: 125 passed.
+
 ## 0.4.2 — 2026-08-30
 
 ### The caps forbade the guest wall
