@@ -2,8 +2,9 @@
 Django settings (projections-and-composition §3).
 
 Scenario: location-bound classified ads — the shop composite (categories +
-attributes + listings + reviews) plus geo, search and moderation. Listing
-coordinates are the listing's own fields, not a projection.
+attributes + listings + reviews) plus geo, search, moderation and reference
+vocabularies. Listing coordinates are the listing's own fields, not a
+projection.
 
 A generated project (stapel-assemble … --libs classified) gets the
 same wiring from the STAPEL_LIBS registry; this module is the single source
@@ -18,6 +19,16 @@ a hand-written settings.py/urls.py copies from instead.
 # per target type's intake_events, so both must load AFTER the modules whose
 # facts they listen to.
 INSTALLED_APPS = [
+    # FIRST, and not as a matter of taste. stapel_vocabularies' AppConfig.
+    # ready() is what hands stapel-attributes its in-process resolver
+    # (`register_vocabulary_resolver(OrmResolver())`), and WITHOUT a resolver
+    # a `ref_select` / `ref_hierarchical_select` config does not validate at
+    # all — it raises INVALID_CONFIG "no vocabulary resolver registered" at
+    # the moment a feature is saved. Django runs `ready()` in this list's
+    # order, so any app whose own ready() or system checks validate a
+    # ref-typed feature config must load AFTER this line; stapel_categories
+    # is the first of them and the one this composite mounts.
+    "stapel_vocabularies",
     "stapel_categories",
     "stapel_listings",
     "stapel_reviews",
@@ -39,15 +50,23 @@ INSTALLED_APPS = [
 # stapel-classified, stapel-categories and stapel-listings contribute only
 # the ``v1/`` segment and expect the host to mount them under
 # ``<mod>/api/`` (api-versioning.md
-# §2, §6); stapel-reviews, geo, search and moderation bake ``api/v1/`` in
-# themselves. Mounting the first two at a bare ``<mod>/`` produced
-# ``/listings/v1/...``, which stapel-core's own mounts.E004 rejects — 40
-# errors from one prefix, and `manage.py check` was never run against this
-# preset until search and moderation arrived.
+# §2, §6); stapel-vocabularies, stapel-reviews, geo, search and moderation
+# bake ``api/v1/`` in themselves. Mounting the first two at a bare ``<mod>/``
+# produced ``/listings/v1/...``, which stapel-core's own mounts.E004 rejects
+# — 40 errors from one prefix, and `manage.py check` was never run against
+# this preset until search and moderation arrived.
+#
+# stapel-vocabularies is in the SECOND family: its ``urls.py`` already carries
+# ``path('api/v1/', ...)``, so the mount is a bare ``vocabularies/`` and the
+# public prefix is ``/vocabularies/api/v1/``. Mounting it is also what makes
+# ``stapel_vocabularies.W002`` measurable — that check reads the deployment's
+# URL surface to decide whether the process holding the terms is the one that
+# declined to answer about them.
 URL_INCLUDES = [
     ("classified/api/", "stapel_classified.urls"),
     ("categories/api/", "stapel_categories.urls"),
     ("listings/api/", "stapel_listings.urls"),
+    ("vocabularies/", "stapel_vocabularies.urls"),
     ("reviews/", "stapel_reviews.urls"),
     ("geo/", "stapel_geo.urls"),
     ("search/", "stapel_search.urls"),
@@ -92,6 +111,23 @@ SETTINGS_DEFAULTS = {
     # GATE instead (tests/test_composite.py): with stapel-moderation
     # installed, listings must not approve its own submissions, or the
     # pre-publication queue would exist and never hold anything.
+    #
+    # NOTE there is no STAPEL_VOCABULARIES entry either, and its CONFIG.MD is
+    # the reason: every key in that namespace is optional, and the one axis —
+    # REGISTER_RESOLVER — already defaults to True, which is exactly what a
+    # deployment that MOUNTS the vocabularies wants. Restating it would add a
+    # second place to drift from, and turning it off here would produce the
+    # deployment stapel_vocabularies.W002 exists to report: the process
+    # holding the terms refusing to answer about them, so every ref_select
+    # feature fails to save while GET /vocabularies/api/v1/... lists the same
+    # terms. It is held as a GATE instead (tests/test_vocabularies.py), the
+    # same way AUTO_APPROVE_ON_PUBLISH is.
+    #
+    # RECOMMENDED_ACCESS_ROLES gains nothing either: the read surface is
+    # `ReadOnlyOrStaff`, i.e. anonymous GETs and no writer at all (loading a
+    # catalogue is `manage.py load_vocabulary`, an operator action against a
+    # reviewed file), so there is no clearance for a role table to grant —
+    # the same posture stapel-categories' public reads have.
     "STAPEL_SEARCH": {
         # stapel-search ships BUILTIN_SOURCES = {} — it knows nothing about
         # listings. The overlay is {doc_type: dotted path}, resolved and

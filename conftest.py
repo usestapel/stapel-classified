@@ -61,6 +61,10 @@ def pytest_configure(config):
                 "stapel_core.django.apps.CommonDjangoConfig",
                 "stapel_core.django.users",
                 "stapel_core.django.projections",
+                # Before stapel_categories, and the preset says why: this
+                # app's ready() registers the OrmResolver, without which a
+                # ref_select feature config cannot be validated at all.
+                "stapel_vocabularies",
                 "stapel_categories",
                 "stapel_listings",
                 "stapel_reviews",
