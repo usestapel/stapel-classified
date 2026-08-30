@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.5.1 — 2026-08-31
+
+Patch: the member ranges move, nothing about this composite's surface does.
+
+### `stapel-categories>=0.8.1,<0.9` (was `>=0.7,<0.8`)
+
+Both numbers in that jump are about the catalogue this composite exists to
+carry.
+
+**0.8.0** stops keying a catalog re-import on the **slug**. An imported
+category's slug is derived from the source catalogue's node path, so when the
+source renames a node the slug moves and the node id does not — and under the
+old key that re-import read as "one category disappeared, an unrelated one
+appeared": it soft-deleted the row holding the listings and created a duplicate
+beside it. Matching is `(external_source, external_id)` first now, the slug
+only as a fallback for rows with no source id.
+
+**0.8.1** is what makes a full-catalog import finish at all. django-treenode
+rebuilt its denormalized tree columns from a `post_save` receiver — one read of
+the table plus one `UPDATE` per row — for every row written, and `load_catalog`
+writes every record through `save()` by design. A 2901-leaf Avito import (3444
+categories, 14 409 feature rows, 52 488 links) never completed; it is 185 s
+now.
+
+The floor moves with the cap for this composite's usual reason: a deployment
+free to resolve back under either of those is a deployment whose declaration
+does not hold.
+
+### `stapel-shop>=0.2.8,<0.3` (was `>=0.2.6`)
+
+Same rule, one member down. shop 0.2.6 and 0.2.7 both cap
+`stapel-categories<0.8`, so a resolver left free to pick either picks a shop
+whose own cap contradicts the line above and answers `ResolutionImpossible`.
+0.2.8 is the shop release that admits categories 0.8.
+
+The "known, deliberate, and not fixed here" hold that 0.5.0 shipped with is
+therefore closed: shop 0.2.7 answered the attributes-v2 half of it and 0.2.8
+the categories-0.8 half.
+
 ## 0.5.0 — 2026-08-30
 
 Minor, and pre-1.0 house semver reads a minor as breaking. The composite

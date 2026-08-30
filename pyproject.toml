@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.5.0"
+version = "0.5.1"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -31,14 +31,15 @@ classifiers = [
 # pick 0.5.5 and leave every parent-category filter finding nothing. The
 # range itself moved to 0.7 in this release — see the block further down.
 #
-# KNOWN, DELIBERATE, AND NOT FIXED HERE: stapel-shop 0.2.6 (the newest
-# release there is) caps `stapel-categories<0.6`, `stapel-attributes<0.5` and
-# `stapel-listings<0.10`, so `pip install stapel-classified==0.5.0` is
-# ResolutionImpossible until stapel-shop ships a cap bump. Lowering the
-# ranges below to satisfy the stale caps would pin every deployment to a
-# fleet where rules, form metadata and ref-typed features do not exist at
-# all — the composite would install and the vertical it declares would not
-# work. The cap bump belongs in stapel-shop, which owns those caps.
+# THAT KNOWN HOLD IS CLOSED. 0.5.0 shipped saying so in as many words: shop
+# 0.2.6 capped `stapel-categories<0.6`, `stapel-attributes<0.5` and
+# `stapel-listings<0.10`, so `pip install stapel-classified==0.5.0` was
+# ResolutionImpossible until stapel-shop shipped a cap bump, and lowering the
+# ranges here to satisfy stale caps would have pinned every deployment to a
+# fleet where rules, form metadata and ref-typed features do not exist. shop
+# 0.2.7 answered the attributes-v2 half and 0.2.8 the categories-0.8 half, so
+# the floor below moves to 0.2.8 — the same rule, one member down: a resolver
+# left free to pick 0.2.6 picks a shop whose own cap contradicts this file.
 #
 # stapel-moderation's floor is raised to 0.3 by the same target: a chat
 # message is the first target here whose content is PRIVATE, and 0.3.0 is the
@@ -89,11 +90,15 @@ classifiers = [
 # release whose recorded rule corpus is what the two evaluators (Python and
 # attributes-react) are held to.
 #
-# stapel-categories >=0.7: the six new `FeatureDef` keys (`rules`,
-# `description`, `example`, `default`, `hints`, `group`) are stored, served by
-# `categories.features` and declared in `$defs.ResolvedFeature` there. On 0.6
-# a category can hold no rule and no ref-typed feature, so the vocabularies
-# this composite now mounts would have nothing pointing at them.
+# stapel-categories >=0.8.1 (was >=0.7 in 0.5.0): 0.7 is where the six new
+# `FeatureDef` keys (`rules`, `description`, `example`, `default`, `hints`,
+# `group`) are stored, served by `categories.features` and declared in
+# `$defs.ResolvedFeature` — on 0.6 a category can hold no rule and no
+# ref-typed feature, so the vocabularies this composite mounts would have
+# nothing pointing at them. The floor moved past it twice more in 0.5.1: 0.8.0
+# keys a catalog re-import on `(external_source, external_id)` instead of the
+# slug, and 0.8.1 makes a full-catalog import complete at all. See the
+# dependency line for both.
 #
 # stapel-listings >=0.10: the release where requiredness on publish is the
 # RULE STATE rather than `mandatory` (a conditionally required field blocks
@@ -118,8 +123,25 @@ dependencies = [
     # the floor moves with the cap rather than leaving a deployment able to
     # resolve back onto a version where the guest wall is a comment.
     "stapel-reviews>=0.4,<0.5",
-    "stapel-shop>=0.2.6,<0.3",
-    "stapel-categories>=0.7,<0.8",
+    # >=0.2.8, not >=0.2.6: 0.2.8 is the release whose own
+    # `stapel-categories` cap admits 0.8. Held at 0.2.6 a resolver can pick a
+    # shop that caps `stapel-categories<0.8` and the line below has no
+    # solution — the same ResolutionImpossible this composite has now walked
+    # into three times, one member down.
+    "stapel-shop>=0.2.8,<0.3",
+    # >=0.8.1,<0.9, and the floor moves with the cap for the usual reason.
+    # 0.8.0 stops keying a catalog re-import on the SLUG: an imported
+    # category's slug comes from the source catalogue's node path, so a
+    # source-side rename moved the slug while the node id stayed, and the
+    # re-import soft-deleted the row holding the listings and created a
+    # duplicate beside it. Matching is `(external_source, external_id)` first
+    # now. 0.8.1 is what makes a full catalog import finish at all — the tree
+    # cache was rebuilt once per row written, so a 2901-leaf import (3444
+    # categories, 14 409 feature rows) never completed; it is 185 s now. A
+    # composite that mounts stapel-vocabularies exists to carry an imported
+    # marketplace catalogue, so a deployment able to resolve back under either
+    # of those is a deployment whose declaration does not hold.
+    "stapel-categories>=0.8.1,<0.9",
     "stapel-vocabularies>=0.1,<0.2",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
