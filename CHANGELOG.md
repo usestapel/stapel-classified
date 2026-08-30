@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.5.3 — 2026-08-31
+
+The composite kind reaches the stand. Four member ranges move; this composite's
+own surface does not.
+
+`stapel-attributes>=0.6,<0.7` (was `>=0.5.1,<0.6`), `stapel-categories>=0.8.3`
+(was `>=0.8.2`), `stapel-listings>=0.10.2` (was `>=0.10`),
+`stapel-shop>=0.2.9` (was `>=0.2.8`).
+
+### Why the cap had to move rather than hold
+
+0.5.2 pinned the members whose own caps matched this one — every line said
+`stapel-attributes<0.6`, and that was coherent. It was also the wall: **2 468
+fields of the Avito autoload corpus are composites** (a wholesale discount
+ladder — "from N units, M % off", up to five steps; a compatible-cars table),
+and until stapel-attributes 0.6.0 no kind could hold a list of rows, so the
+importer counted them and dropped them. A composite whose whole subject is an
+imported marketplace catalogue cannot cap a fleet under the release that stops
+losing 2 % of every leaf's schema.
+
+So the four lines move together, and the floors move with the caps for the
+usual reason: a fleet able to resolve back onto the older member is a fleet
+whose declaration does nothing.
+
+- **attributes 0.6**: the `group` type — `config.fields` is a list of full
+  feature definitions, the value is a list of rows keyed by child slug, and
+  each cell is validated by its child's own type. Nesting depth is 1, a child
+  may not be a `header`, and a child may not carry `rules` (the rule engine
+  reads a flat map of top-level slugs, so a rule inside a row could never
+  fire) — all three enforced, not documented.
+- **categories 0.8.3**: the contract triad names `GroupConfig`/`GroupDto`,
+  `translation_keys` walks a composite's children (they are not catalog rows,
+  so nothing else reaches their names and option labels), and the
+  ResolvedFeature gate covers the one config that carries FeatureDefs inside
+  it. Held at 0.8.2 — whose own cap is `attributes<0.6` — the line above has
+  no solution.
+- **listings 0.10.2**: `FeatureDto`/`FeatureDao` name the composite, and the
+  module states `attributes>=0.6,<0.7`, the range its committed discriminator
+  mapping is actually true for. 0.10.1 named the type while still declaring a
+  floor of 0.5, so it fails its own contract test on the range it advertises.
+- **shop 0.2.9**: its own attributes cap becomes `<0.7`. Held at 0.2.8 (cap
+  `<0.6`) this composite's attributes line has no solution — the same
+  `ResolutionImpossible` walked into four times now.
+
+Nothing in this package reads the new type: search skips it (a table has no
+single filterable value), and the ranges are the whole coupling.
+
 ## 0.5.2 — 2026-08-31
 
 Patch on a patch, one number: `stapel-categories>=0.8.2,<0.9` (was `>=0.8.1`).

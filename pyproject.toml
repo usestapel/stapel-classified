@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.5.2"
+version = "0.5.3"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -117,7 +117,16 @@ classifiers = [
 # release; the cap is the house pre-1.0 rule (minor = breaking).
 dependencies = [
     "stapel-core>=0.45,<1.0",
-    "stapel-attributes>=0.5.1,<0.6",
+    # <0.7 with the floor at 0.6: stapel-attributes 0.6.0 adds the composite
+    # `group` kind — one feature holding a list of ROWS of child feature
+    # definitions. It is not a nicety for an imported marketplace catalogue:
+    # 2 468 fields of the Avito autoload corpus ARE composites (a wholesale
+    # discount ladder, a compatible-cars table), and until 0.6 the importer
+    # counted them and dropped them. The floor moves with the cap for the
+    # usual reason — a fleet able to resolve back onto 0.5 is a fleet whose
+    # catalogue silently loses those fields again — and because the two
+    # members below now require it themselves.
+    "stapel-attributes>=0.6,<0.7",
     # >=0.4, not >=0.2: 0.4.0 is where ALLOW_ANONYMOUS_WRITES exists at all.
     # A fleet that declares it under the old range gets an inert setting, so
     # the floor moves with the cap rather than leaving a deployment able to
@@ -128,7 +137,10 @@ dependencies = [
     # shop that caps `stapel-categories<0.8` and the line below has no
     # solution — the same ResolutionImpossible this composite has now walked
     # into three times, one member down.
-    "stapel-shop>=0.2.8,<0.3",
+    # >=0.2.9: 0.2.9 is where shop's own attributes cap becomes <0.7. Held at
+    # 0.2.8 (cap <0.6) the attributes line above has no solution — the same
+    # ResolutionImpossible this composite has now walked into four times.
+    "stapel-shop>=0.2.9,<0.3",
     # >=0.8.1,<0.9, and the floor moves with the cap for the usual reason.
     # 0.8.0 stops keying a catalog re-import on the SLUG: an imported
     # category's slug comes from the source catalogue's node path, so a
@@ -147,7 +159,15 @@ dependencies = [
     # composite that mounts stapel-vocabularies exists to carry an imported
     # marketplace catalogue, so a deployment able to resolve back under either
     # of those is a deployment whose declaration does not hold.
-    "stapel-categories>=0.8.2,<0.9",
+    # >=0.8.3 rather than >=0.8.2, and for the mirror of 0.8.2's own reason:
+    # 0.8.2 capped `stapel-attributes<0.6` to state the range it was tested
+    # against, so held there this composite's attributes line above has no
+    # solution. 0.8.3 does the work instead — the contract triad names
+    # `GroupConfig`/`GroupDto`, translation_keys walks a composite's children
+    # (they are not catalog rows, so nothing else reaches their labels), and
+    # the ResolvedFeature gate covers the one config that carries FeatureDefs
+    # inside it.
+    "stapel-categories>=0.8.3,<0.9",
     "stapel-vocabularies>=0.1,<0.2",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
@@ -155,7 +175,11 @@ dependencies = [
     # this composite declares is a deployment whose declaration does nothing.
     # Here the behaviour is rule-state requiredness on publish and the ref
     # DAO in the title/badge projections — see the block above.
-    "stapel-listings>=0.10,<0.11",
+    # >=0.10.2: 0.10.1 regenerated the schema against attributes 0.6 while
+    # still declaring a floor of 0.5, so its own contract test fails on the
+    # range it advertises; 0.10.2 states >=0.6,<0.7, which is the range this
+    # composite now declares one member up.
+    "stapel-listings>=0.10.2,<0.11",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for
