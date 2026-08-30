@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.5.3"
+version = "0.5.4"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -131,7 +131,14 @@ dependencies = [
     # A fleet that declares it under the old range gets an inert setting, so
     # the floor moves with the cap rather than leaving a deployment able to
     # resolve back onto a version where the guest wall is a comment.
-    "stapel-reviews>=0.4,<0.5",
+    # >=0.5, not >=0.4: 0.5.0 is where stapel_reviews subscribes 'user.merged'
+    # and re-parents an author's reviews to the surviving account. Under the
+    # old range a resolver picks 0.4.x, and a host that mounts it fails
+    # stapel_core.lifecycle.E001 at `manage.py check` — which is exactly what
+    # 0.5.1..0.5.3 of THIS package died of, three publish runs in a row: the
+    # composite mounts reviews, so the composite is where the silence is
+    # reported. The cap moves with the floor by the house pre-1.0 rule.
+    "stapel-reviews>=0.5,<0.6",
     # >=0.2.8, not >=0.2.6: 0.2.8 is the release whose own
     # `stapel-categories` cap admits 0.8. Held at 0.2.6 a resolver can pick a
     # shop that caps `stapel-categories<0.8` and the line below has no
@@ -140,7 +147,10 @@ dependencies = [
     # >=0.2.9: 0.2.9 is where shop's own attributes cap becomes <0.7. Held at
     # 0.2.8 (cap <0.6) the attributes line above has no solution — the same
     # ResolutionImpossible this composite has now walked into four times.
-    "stapel-shop>=0.2.9,<0.3",
+    # >=0.2.10: 0.2.10 is where shop's own reviews cap becomes <0.6. Held at
+    # 0.2.9 (cap <0.5) the reviews line above has no solution — the same
+    # ResolutionImpossible this composite has now walked into five times.
+    "stapel-shop>=0.2.10,<0.3",
     # >=0.8.1,<0.9, and the floor moves with the cap for the usual reason.
     # 0.8.0 stops keying a catalog re-import on the SLUG: an imported
     # category's slug comes from the source catalogue's node path, so a
@@ -187,13 +197,25 @@ dependencies = [
     # it (preset.py:25,52) — so the range is the whole coupling.
     "stapel-geo>=0.2,<0.5",
     "stapel-search>=0.3.1,<0.4",
-    "stapel-moderation>=0.3,<0.4",
+    # >=0.4, not >=0.3: 0.4.0 is where stapel_moderation subscribes
+    # 'user.merged' — a merge re-parents the reports and decisions an account
+    # holds, and an app that only knows 'user.deleted' strands them. Under
+    # the old range a resolver picks 0.3.x and this composite's own
+    # `manage.py check` raises stapel_core.lifecycle.E001; the cap moves with
+    # the floor by the house pre-1.0 rule.
+    "stapel-moderation>=0.4,<0.5",
     # >=0.6.1 is LOAD-BEARING, not hygiene: 0.6.1 is where chat began
     # refusing a blocked pair the THREAD at create_direct, and 0.4.0
     # deleted this package's own pre-creation door on that promise.
     # Against 0.6.0 the deletion re-opens the hole it covered — a blocked
     # buyer's empty thread arriving in the blocker's inbox.
-    "stapel-chat>=0.6.1,<0.8",
+    # >=0.6.3 as of 0.5.4, for the third instance of the same reason: 0.6.3 is
+    # where chat consumes 'user.merged' and moves a guest's participations,
+    # authored messages and assigned_operator rows onto the survivor. This
+    # suite MOUNTS chat, so a floor of 0.6.1 lets a runner install a chat that
+    # trips stapel_core.lifecycle.E001 — and a deployment on 0.6.1 loses a
+    # signed-in visitor's whole conversation to the CASCADE.
+    "stapel-chat>=0.6.3,<0.8",
 ]
 
 # The block harness this module ships (stapel_classified/testing.py). A
@@ -234,7 +256,12 @@ test = [
     # demands, and the display-name/public-card reads the header makes.
     # A harness with a fixture in its place proved only that the fixture
     # agreed with itself.
-    "stapel-profiles>=0.16.0,<1.0",
+    # >=0.17.0, not >=0.16.0: 0.17.0 is where stapel_profiles subscribes
+    # 'user.merged'. The suite MOUNTS it, so a floor under 0.17.0 lets a
+    # runner install a profiles that fails stapel_core.lifecycle.E001 in
+    # tests/test_composite.py — the same class of red the reviews and
+    # moderation floors above were raised for, one extra down.
+    "stapel-profiles>=0.17.0,<1.0",
     "stapel-realtime[channels]>=0.1.2,<1.0",
 ]
 

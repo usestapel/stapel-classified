@@ -24,7 +24,7 @@ pip install stapel-classified
 
 | Fact | Value |
 |---|---|
-| Version | `0.5.3` |
+| Version | `0.5.4` |
 | Python | `>=3.11` (3.11, 3.12, 3.13, 3.14) |
 | HTTP operations | 3 |
 | Config axes | 3 |

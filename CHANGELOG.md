@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.5.4 — 2026-08-31
+
+Five member floors move. This composite's own surface does not, and no code in
+it changed — the whole release is the ranges.
+
+`stapel-moderation>=0.4,<0.5` (was `>=0.3,<0.4`), `stapel-reviews>=0.5,<0.6`
+(was `>=0.4,<0.5`), `stapel-chat>=0.6.3` (was `>=0.6.1`), `stapel-shop>=0.2.10`
+(was `>=0.2.9`), and in the `test` extra `stapel-profiles>=0.17.0` (was
+`>=0.16.0`).
+
+### Three publish runs died on a check this composite is the only place to fail
+
+0.5.1, 0.5.2 and 0.5.3 are tagged, and none of them reached PyPI — which has
+stood at 0.4.3 since. All three died the same way, in `test_composite.py`:
+
+```
+stapel_core.lifecycle.E001: app 'stapel_moderation' handles the 'user.deleted'
+action but registers no handler for 'user.merged'
+stapel_core.lifecycle.E001: app 'stapel_reviews' ... (the same)
+```
+
+A merge re-parents a user's rows onto the surviving account. An app that knows
+only deletion strands them: the rows keep pointing at an id that can no longer
+sign in, and no erasure is ever requested for it either. `stapel_core` reports
+that silence as an ERROR — subscribing `user.merged` and subscribing an
+explicit no-op are both green; saying nothing is not.
+
+The handlers had already shipped — stapel-moderation 0.4.0 and stapel-reviews
+0.5.0 are both on PyPI. This composite's ranges were what kept a fleet off
+them, and a composite is exactly the place where that shows up, because a
+composite is the one build that MOUNTS all of these apps at once and runs
+`manage.py check` against a realistic host. Nothing was wrong with the code
+here; the declaration was wrong, and the gate said so three times.
+
+- **moderation 0.4**: `user.merged` re-parents reports and decisions.
+- **reviews 0.5**: `user.merged` re-parents an author's reviews.
+- **chat 0.6.3**: `user.merged` moves a guest's participations, authored
+  messages and `assigned_operator` rows onto the survivor. Not caught by the
+  gate (a resolver was free to pick 0.7.x and did), but `>=0.6.1` admits two
+  releases that fail it — and on those a visitor who wrote to a seller and
+  then signed in lost the conversation to a CASCADE.
+- **profiles 0.17.0**, in the `test` extra: the suite MOUNTS profiles for the
+  block provider, so its floor is under the same gate as the members.
+- **shop 0.2.10**: its own reviews cap becomes `<0.6`. Held at 0.2.9 (cap
+  `<0.5`) the reviews line above has no solution — the fifth
+  `ResolutionImpossible` in this composite's history, and the second one this
+  month resolved by releasing the member first.
+
+The floors move with the caps for the usual reason: a fleet able to resolve
+back onto a member that fails `manage.py check` is a fleet whose declaration
+does nothing. 141 passed.
+
 ## 0.5.3 — 2026-08-31
 
 The composite kind reaches the stand. Four member ranges move; this composite's
