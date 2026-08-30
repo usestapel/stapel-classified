@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.4.3"
-description = "Composite: classified ads — the shop composite + geo + search + moderation"
+version = "0.5.0"
+description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-keywords = ["django", "stapel", "classified", "composite", "geo", "search", "moderation"]
+keywords = ["django", "stapel", "classified", "composite", "geo", "search", "moderation", "vocabularies"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Framework :: Django",
@@ -28,7 +28,17 @@ classifiers = [
 # stapel-categories is pinned DIRECTLY, above the floor stapel-shop asks for:
 # the search source's category rollup is answered by `categories.path`, which
 # arrived in 0.5.6. Depending on it only transitively would let a resolver
-# pick 0.5.5 and leave every parent-category filter finding nothing.
+# pick 0.5.5 and leave every parent-category filter finding nothing. The
+# range itself moved to 0.7 in this release — see the block further down.
+#
+# KNOWN, DELIBERATE, AND NOT FIXED HERE: stapel-shop 0.2.6 (the newest
+# release there is) caps `stapel-categories<0.6`, `stapel-attributes<0.5` and
+# `stapel-listings<0.10`, so `pip install stapel-classified==0.5.0` is
+# ResolutionImpossible until stapel-shop ships a cap bump. Lowering the
+# ranges below to satisfy the stale caps would pin every deployment to a
+# fleet where rules, form metadata and ref-typed features do not exist at
+# all — the composite would install and the vertical it declares would not
+# work. The cap bump belongs in stapel-shop, which owns those caps.
 #
 # stapel-moderation's floor is raised to 0.3 by the same target: a chat
 # message is the first target here whose content is PRIVATE, and 0.3.0 is the
@@ -65,32 +75,66 @@ classifiers = [
 # rating reads `reviews.aggregate`, so a module this composite MOUNTS was
 # reaching it only transitively. The sibling-declaration gate
 # (tests/test_test_dependencies.py) is what noticed.
+#
+# stapel-attributes becomes a DIRECT pin in 0.5.0. It is an L1 library and
+# NOT a Django app (it is deliberately absent from preset.INSTALLED_APPS),
+# and until now it arrived transitively through listings and shop. It cannot
+# any more: this composite now installs stapel-vocabularies, whose whole job
+# is to IMPLEMENT attributes' `VocabularyResolver` protocol, and that
+# protocol (`stapel_attributes.vocabularies`) together with the `ref_select`
+# / `ref_hierarchical_select` types is 0.5. Left transitive, a resolver could
+# settle on 0.4.x and the deployment would boot with
+# `stapel_vocabularies.W001` — the terms API answering normally while every
+# ref-typed feature refuses to save. >=0.5.1, not >=0.5.0: 0.5.1 is the
+# release whose recorded rule corpus is what the two evaluators (Python and
+# attributes-react) are held to.
+#
+# stapel-categories >=0.7: the six new `FeatureDef` keys (`rules`,
+# `description`, `example`, `default`, `hints`, `group`) are stored, served by
+# `categories.features` and declared in `$defs.ResolvedFeature` there. On 0.6
+# a category can hold no rule and no ref-typed feature, so the vocabularies
+# this composite now mounts would have nothing pointing at them.
+#
+# stapel-listings >=0.10: the release where requiredness on publish is the
+# RULE STATE rather than `mandatory` (a conditionally required field blocks
+# publication, a rule-hidden answer is dropped instead of stored) and where
+# `features_title` / `features_badges` carry the `ref_select` DAO whole — the
+# `labels` half that `search_sources._title_text` reads for display. On 0.9
+# the mapper's ref-typed title chips would fall back to term codes.
+#
+# stapel-search >=0.3.1: `get_facet_mapping('ref_select') == 'term'` /
+# `'ref_hierarchical_select') == 'path'`, and `closed_options` is not built
+# for any config carrying an `optionsRef` — a vocabulary is open-ended for
+# the facet planner, so zero-filling it would invent counts for 14 962 phone
+# models nobody asked about.
+#
+# stapel-vocabularies >=0.1,<0.2 — the new member. Its floor is its first
+# release; the cap is the house pre-1.0 rule (minor = breaking).
 dependencies = [
     "stapel-core>=0.45,<1.0",
+    "stapel-attributes>=0.5.1,<0.6",
     # >=0.4, not >=0.2: 0.4.0 is where ALLOW_ANONYMOUS_WRITES exists at all.
     # A fleet that declares it under the old range gets an inert setting, so
     # the floor moves with the cap rather than leaving a deployment able to
     # resolve back onto a version where the guest wall is a comment.
     "stapel-reviews>=0.4,<0.5",
     "stapel-shop>=0.2.6,<0.3",
-    "stapel-categories>=0.5.6,<0.6",
-    # <0.10, not <0.9: 0.9.0 is where ALLOW_ANONYMOUS_WRITES exists — the
-    # server-side decision on whether a guest may create and publish. Held at
-    # <0.9 this composite pins a fleet to versions where that setting does not
-    # exist, so a deployment declaring it is authorizing a guest anyway
-    # (a guest is a real authenticated user and satisfies IsAuthenticated).
-    # pip refuses the resolution outright rather than warning. The floor moves
-    # to 0.9 with the cap, for the reason 0.4.1 moved it to 0.8: a deployment
-    # able to resolve back onto the version without the wall is a deployment
-    # whose declared wall does nothing.
-    "stapel-listings>=0.9,<0.10",
+    "stapel-categories>=0.7,<0.8",
+    "stapel-vocabularies>=0.1,<0.2",
+    # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
+    # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
+    # a deployment able to resolve back onto a listings without the behaviour
+    # this composite declares is a deployment whose declaration does nothing.
+    # Here the behaviour is rule-state requiredness on publish and the ref
+    # DAO in the title/badge projections — see the block above.
+    "stapel-listings>=0.10,<0.11",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for
     # latitude and longitude. Nothing here imports stapel_geo — the preset only mounts
     # it (preset.py:25,52) — so the range is the whole coupling.
     "stapel-geo>=0.2,<0.5",
-    "stapel-search>=0.2.2,<0.3",
+    "stapel-search>=0.3.1,<0.4",
     "stapel-moderation>=0.3,<0.4",
     # >=0.6.1 is LOAD-BEARING, not hygiene: 0.6.1 is where chat began
     # refusing a blocked pair the THREAD at create_direct, and 0.4.0
