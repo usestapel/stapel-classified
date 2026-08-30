@@ -34,6 +34,11 @@ the "declared but not connected" defect in the seam that exists to prevent
 it. The honest wiring is the declared fallback (``ACCEPT_FEATURES_SEARCH``,
 on by default); closing it is one field in listings' document builder, and it
 is named as such in this composite's CHANGELOG.
+
+The one place DAOs *are* read is ``_title_text``, and since 0.5.0 it reads
+one field off them: a vocabulary-backed value's ``labels``. That is not the
+DAO path reopened — ``features_title`` is served, it is a DAO list by
+contract, and the display half of a ref value exists nowhere else.
 """
 from __future__ import annotations
 
@@ -75,29 +80,61 @@ def _datetime(value: Any):
     return parse_datetime(value)
 
 
+#: Attribute types whose stored ``value`` is a list of term CODES and whose
+#: display half is a separate ``labels`` snapshot on the same DAO
+#: (stapel-attributes 0.5: ``ref_select`` / ``ref_hierarchical_select``).
+#: Named here for the same reason listings names them in ``_LIST_VALUE_TYPES``
+#: rather than letting them fall through a generic branch — a code is not a
+#: word a human ever typed, so a code in the text arm is a chip nobody can
+#: read and a query nobody can match.
+REF_TYPES = frozenset({"ref_select", "ref_hierarchical_select"})
+
+
 def _title_text(payload: dict) -> tuple[str, ...]:
     """Attribute values shown as title chips — weight-B text in the index.
 
     ``features_title`` is a list of DAOs and ``features_search`` is the
     module's own extraction of the searchable values out of those same DAOs.
-    Intersecting them keeps ONE definition of "what is searchable about an
-    attribute" (listings'), instead of re-deriving values from DAOs here and
-    letting the two drift.
+    Taking the values from ``features_search`` keeps ONE definition of "what
+    is searchable about an attribute" (listings'), instead of re-deriving
+    values from DAOs here and letting the two drift.
+
+    **Except for the vocabulary-backed types, where the two halves are
+    different things on purpose.** A ``ref_select`` DAO carries ``value`` (the
+    term codes, which is the filter axis and what ``features_search`` serves)
+    AND ``labels`` (the display snapshot taken at write time). The chip a
+    person reads on a result row is "iPhone 10", not ``iphone-10``, and the
+    query a person types is the label too — so for those types the text arm
+    takes ``labels``. Nothing is re-derived: the label snapshot is the owner's,
+    stored beside the codes at publish time, and ``features_search`` below
+    still carries the codes untouched. Empty ``labels`` (a DAO written before
+    the vocabulary answered) falls back to the codes rather than dropping the
+    attribute out of the text arm.
+
+    DAO order is the category's own feature order, and it is preserved:
+    ``text_extra`` is compared field-by-field in the rebuild-vs-live gate, and
+    an order that came out of a set would make that comparison flap.
     """
-    flagged = {
-        str(dao.get("slug"))
+    daos = [
+        dao
         for dao in (payload.get("features_title") or [])
         if isinstance(dao, dict) and dao.get("slug")
-    }
-    if not flagged:
+    ]
+    if not daos:
         return ()
     searchable = payload.get("features_search") or {}
-    return tuple(
-        str(value)
-        for slug in flagged
-        for value in (searchable.get(slug) or [])
-        if value not in (None, "")
-    )
+
+    text: list[str] = []
+    for dao in daos:
+        values = None
+        if str(dao.get("type") or "") in REF_TYPES:
+            labels = dao.get("labels")
+            if isinstance(labels, list) and labels:
+                values = labels
+        if values is None:
+            values = searchable.get(str(dao["slug"])) or []
+        text.extend(str(value) for value in values if value not in (None, ""))
+    return tuple(text)
 
 
 def _card(payload: dict) -> dict:
@@ -194,6 +231,7 @@ def listing_source():
 __all__ = [
     "CONTENT_FUNCTION",
     "EXPORT_FUNCTION",
+    "REF_TYPES",
     "REMOVAL_SIGNALS",
     "SIGNALS",
     "listing_source",
