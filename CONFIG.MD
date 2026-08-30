@@ -2,9 +2,9 @@
 
 Config registry ({static-scaffold-and-config.md} §2). Almost every key here
 belongs to a member module (shop (categories, attributes, listings,
-reviews), geo, search, moderation); see each member's CONFIG.MD (the
-scaffold aggregates them all into the generated project's CONFIG.MD
-automatically).
+reviews), geo, search, moderation, vocabularies); see each member's
+CONFIG.MD (the scaffold aggregates them all into the generated project's
+CONFIG.MD automatically).
 
 Scenario defaults live in `stapel_classified.preset.SETTINGS_DEFAULTS` — they are
 settings-dict PRESETS for member keys, not new keys.
@@ -50,6 +50,29 @@ Presets, not new keys — each one belongs to the member named in the header.
 | `STAPEL_MODERATION["TARGET_TYPES"]["chat_message"]` | post gate, `chat.moderation_content` keyed `message_id`, `can_report` = `classified.can_report_message` | the key is this composite's `<conversation_id>:<message_id>`: chat reads the message half, and only this package can answer off the conversation half whether the reporter was in the thread at all. Evidence-based until 0.3.0, when stapel-chat 0.5.0 started serving the content. |
 | `STAPEL_MODERATION["REASONS"]` | `prohibited_item`, `misleading_price`, `already_sold`, `impersonation` | the complaint taxonomy is universal and moderation ships one; these are the codes a MARKETPLACE needs on top, merged over the built-ins. |
 | `STAPEL_REVIEWS["TARGET_TYPES"]["listing"]` | post-moderated, one per author, responses allowed | stapel-reviews is target-generic and ships an empty registry. |
+
+### `STAPEL_VOCABULARIES` — deliberately absent from the preset
+
+stapel-vocabularies became a member in 0.5.0 and the preset fills in **no**
+key of its namespace. Its CONFIG.MD marks every key optional, and its one
+CTO-facing axis, `REGISTER_RESOLVER`, already defaults to `true` — which is
+what a deployment that MOUNTS the vocabularies wants: the process holding the
+terms is the process that answers about them. Restating the default would
+only add a second place to drift from, so it is held as a gate
+(`tests/test_vocabularies.py`) exactly the way `AUTO_APPROVE_ON_PUBLISH` is.
+
+Turn it off only in a service that installs the app for its models and
+answers over comm instead (`STAPEL_ATTRIBUTES["VOCABULARY_RESOLVER"] =
+"stapel_vocabularies.resolver.CommResolver"`). Turning it off in a process
+that mounts these URLs is `stapel_vocabularies.W002`: every `ref_select`
+feature would refuse to save with "no vocabulary resolver registered" while
+`GET /vocabularies/api/v1/...` kept listing the very same terms.
+
+There is no `STAPEL_ACCESS` row for it either. The read surface is
+`ReadOnlyOrStaff` — anonymous GETs, and no writer at all (loading a catalogue
+is `manage.py load_vocabulary`, an operator action against a reviewed file) —
+so there is no clearance for a role table to grant, the same posture the
+public category reads have.
 
 ## Keys a host must still decide
 

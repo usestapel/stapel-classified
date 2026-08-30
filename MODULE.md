@@ -5,7 +5,7 @@ plus the cross-domain declarations and the cross-domain READS that no member
 is allowed to make.
 
 Members: **shop** (categories + attributes + listings + reviews) + **geo** +
-**search** + **moderation**.
+**search** + **moderation** + **vocabularies**.
 
 **stapel-chat is pinned but is not a member.** Nothing here imports it and
 the preset mounts none of it — but since 0.3.2 this composite READS it, so
@@ -207,6 +207,32 @@ blocking — it used to be duplicated by an axis of the same name in
 `STAPEL_CLASSIFIED`, which is the two-switches-one-fact defect this release
 closed. A host that means it lowers either one knowingly, **there**.
 
+### The vocabularies member and the one ordering rule
+
+`stapel-vocabularies` joined in 0.5.0, and it is the only member whose
+position in `INSTALLED_APPS` is load-bearing. Its `AppConfig.ready()` hands
+stapel-attributes the in-process `OrmResolver`
+(`register_vocabulary_resolver`), and **without a resolver a `ref_select` /
+`ref_hierarchical_select` config does not validate at all** — saving such a
+feature raises `INVALID_CONFIG` "no vocabulary resolver registered". Django
+runs `ready()` in list order, so the app is FIRST in `preset.INSTALLED_APPS`
+and every app that validates a ref-typed config comes after it;
+`stapel_categories` (whose `Feature.clean` is that call) is the first of
+them. `tests/test_vocabularies.py` asserts the order rather than trusting the
+comment.
+
+Everything else about the member is its own: the terms API, the loader, the
+`vocabulary.changed` event and the `CommResolver` for a split deployment. The
+composite adds **no** `STAPEL_VOCABULARIES` preset — see CONFIG.MD for why
+the `REGISTER_RESOLVER` default is held as a gate instead of restated — and
+mounts it at a bare `vocabularies/`, because its `urls.py` bakes `api/v1/` in
+itself.
+
+The coupling to the catalogue is one string: a feature's
+`optionsRef.vocabulary` names a vocabulary slug. Nothing in this composite
+imports `stapel_vocabularies`, and the vocabularies module imports neither
+categories nor listings.
+
 ### The `listing` search source
 
 `stapel_classified/search_sources.py` is the only executable glue in this
@@ -227,6 +253,17 @@ Two properties worth knowing before you extend it:
   listing attributes do not work and `hex_color`'s `simple` axis and unit
   context are gone. Closing it is one field in listings' document builder plus
   dropping `features_search=` for `features=` here.
+- **A vocabulary-backed title chip is a LABEL, and only that one field is
+  read off a DAO** (0.5.0). `features_title` *is* served and it is a DAO list
+  by contract, so `_title_text` takes `labels` for `ref_select` /
+  `ref_hierarchical_select` and leaves every other type on
+  `features_search` — one definition of "searchable", which is listings'.
+  The reason is not cosmetic: `value` on those two types is the term CODE
+  (`iphone-10`), which is the filter axis and must stay one across
+  translations, while the chip a person reads and the query a person types
+  are both the label. Empty `labels` falls back to the codes rather than
+  dropping the attribute out of the text arm. DAO order is preserved — the
+  rebuild-vs-live gate compares `text_extra` field by field.
 
 ### The four moderation target types
 
@@ -409,7 +446,7 @@ mounts nothing.
 
 `stapel-classified` (its own surface, 0.2.0), `stapel-categories` and
 `stapel-listings` contribute only the `v1/` segment and are mounted under
-`<mod>/api/`; `stapel-reviews`, `geo`, `search` and
+`<mod>/api/`; `stapel-vocabularies`, `stapel-reviews`, `geo`, `search` and
 `moderation` bake `api/v1/` in themselves and are mounted at `<mod>/`. Both
 shapes end at `/<mod>/api/v1/...`, which is what `stapel_core.mounts.E004`
 requires. `tests/test_composite.py` runs the whole system-check suite against
@@ -427,3 +464,8 @@ the preset's own URLconf, so a mount that drifts fails here.
 - **A screener** — `SCREEN_ENABLED` is on by default and
   `ON_SCREENING_FAILURE="hold"`, so with no LLM provider configured every
   submission queues for a human rather than publishing unscreened.
+- **Loading a catalogue** — `manage.py load_vocabulary <fixture.json>`. The
+  vocabularies member ships the tables and the endpoints, never the data:
+  there is no writer over HTTP, and a fixture is reviewed like code. A
+  `ref_select` feature pointing at a vocabulary nobody loaded refuses to save,
+  which is the loud failure and the intended one.

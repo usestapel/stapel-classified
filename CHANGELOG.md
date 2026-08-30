@@ -1,5 +1,126 @@
 # Changelog
 
+## 0.5.0 — 2026-08-30
+
+Minor, and pre-1.0 house semver reads a minor as breaking. The composite
+gains a member: **stapel-vocabularies**. A classified marketplace's catalogue
+stops being limited to what fits inline in a category schema.
+
+### Added — `stapel_vocabularies` is a member
+
+The attributes-v2 wave (spec §3) splits a feature's options in two. Small
+option sets stay inline in the config, as they always were; a *reference
+vocabulary* — 529 phone vendors, 14 962 models, 53 836 car makes — lives in
+its own tables and a feature points at it with an `optionsRef`. The L2 module
+that owns those tables is stapel-vocabularies 0.1.0, and this composite is
+where a classified deployment gets it wired.
+
+- `preset.INSTALLED_APPS` gains `stapel_vocabularies`, **first in the list**;
+- `preset.URL_INCLUDES` gains `("vocabularies/", "stapel_vocabularies.urls")`
+  — the module bakes `api/v1/` in itself (the reviews/geo/search/moderation
+  family), so the public prefix is `/vocabularies/api/v1/…`.
+
+### Why the app is FIRST, and why that is a test rather than a comment
+
+`stapel_vocabularies.ready()` hands stapel-attributes the in-process
+`OrmResolver` (`register_vocabulary_resolver`). Without a resolver a
+`ref_select` / `ref_hierarchical_select` config **does not validate at all**:
+saving such a feature raises `INVALID_CONFIG` "no vocabulary resolver
+registered". Django runs `ready()` in `INSTALLED_APPS` order, so every app
+that validates a ref-typed config has to come after it — `stapel_categories`
+first among them, since `Feature.clean` is exactly that call.
+
+An ordering rule stated only in a comment is one someone re-sorts
+alphabetically six months later, so
+`tests/test_vocabularies.py::test_vocabularies_loads_before_anything_that_validates_a_ref_config`
+asserts the index, and a positive/negative pair asserts the consequence: a
+`ref_select` feature naming a real level saves, one naming a level the
+vocabulary lacks is refused. The second half matters as much as the first —
+a suite that only proved "a resolver is registered" would pass against one
+that answers yes to everything.
+
+### Changed — a vocabulary-backed title chip travels as a LABEL
+
+`search_sources._title_text` builds the index's weight-B text arm from the
+attributes flagged `show_at_title`. It took every value out of
+`features_search`, which is right for every type but the two new ones: their
+`features_search` entry is the term **codes**, deliberately, because a code
+is the filter axis and must keep matching across a translation.
+
+A code is not a word anybody typed. Rendered on a result row it reads
+`iphone-10`; searched for as "iPhone 10" it matched nothing but the free-text
+title. So for `ref_select` / `ref_hierarchical_select` the text arm now takes
+the DAO's `labels` — the display snapshot listings stores beside the codes at
+publish time (listings 0.10.0). Nothing is re-derived and no second read path
+is invented: `features_title` is served, it is a DAO list by contract, and
+`features_search` still carries the codes untouched into `features_search=`.
+
+Two smaller properties came with it: an empty `labels` (a DAO written before
+the vocabulary could answer) falls back to the codes rather than dropping the
+attribute out of the text arm, and DAO order is now preserved — the values
+used to come out of a `set`, and `text_extra` is compared field by field in
+the rebuild-vs-live gate.
+
+### Changed — the pin block
+
+| Package | 0.4.3 | 0.5.0 |
+|---|---|---|
+| stapel-attributes | *(transitive)* | `>=0.5.1,<0.6` |
+| stapel-categories | `>=0.5.6,<0.6` | `>=0.7,<0.8` |
+| stapel-listings | `>=0.9,<0.10` | `>=0.10,<0.11` |
+| stapel-search | `>=0.2.2,<0.3` | `>=0.3.1,<0.4` |
+| stapel-vocabularies | — | `>=0.1,<0.2` |
+
+`stapel-attributes` becomes a **direct** pin. It is an L1 library and not a
+Django app (deliberately absent from `INSTALLED_APPS`), and it arrived
+transitively until now. It cannot any more: the new member's entire job is to
+implement attributes' `VocabularyResolver` protocol, which is 0.5. Left
+transitive, a resolver could settle on 0.4.x and the deployment would boot
+with `stapel_vocabularies.W001` — the terms API answering normally while
+every ref-typed feature refuses to save.
+
+The other three move for the reason this file has moved a cap twice before: a
+deployment able to resolve back onto a version without the behaviour the
+composite declares is a deployment whose declaration does nothing. categories
+0.7 stores and serves the six new `FeatureDef` keys; listings 0.10 makes
+requiredness on publish the rule state and carries the ref DAO whole into
+`features_title` / `features_badges`; search 0.3.1 maps `ref_select` to a
+`term` facet, `ref_hierarchical_select` to a `path` one, and builds no
+`closed_options` for a config with an `optionsRef` (a vocabulary is
+open-ended for the planner — zero-filling it would invent counts for 14 962
+phone models nobody asked about).
+
+**A known blocker, named rather than papered over.** stapel-shop 0.2.6 — the
+newest release there is — caps `stapel-categories<0.6`,
+`stapel-attributes<0.5` and `stapel-listings<0.10`, so
+`pip install stapel-classified==0.5.0` is `ResolutionImpossible` until
+stapel-shop ships a cap bump. Lowering the ranges above to satisfy those
+stale caps would pin every deployment to a fleet where rules, form metadata
+and ref-typed features do not exist at all: the composite would install and
+the vertical it declares would not work. The cap bump belongs in the repo
+that owns the caps.
+
+### Config
+
+No new key. `STAPEL_VOCABULARIES` is deliberately **not** in
+`preset.SETTINGS_DEFAULTS`: every key in that namespace is optional and its
+one axis, `REGISTER_RESOLVER`, already defaults to `true` — which is what a
+deployment that MOUNTS the vocabularies wants, the process holding the terms
+being the one that answers about them. Restating a default only adds a second
+place to drift from, so it is held as a gate the way
+`AUTO_APPROVE_ON_PUBLISH` is. `RECOMMENDED_ACCESS_ROLES` is unchanged too:
+the read surface is `ReadOnlyOrStaff` (anonymous GETs, no writer at all —
+loading a catalogue is `manage.py load_vocabulary`), so there is no clearance
+for a role table to grant.
+
+### Operator note
+
+A deployment upgrading to 0.5.0 runs `migrate` for the new app's three tables
+(`Vocabulary`, `Term`, `TermEdge`) and loads its catalogues with
+`manage.py load_vocabulary <fixture.json>`. Until a vocabulary is loaded, a
+`ref_select` feature pointing at its slug refuses to save — the loud failure,
+and the intended one.
+
 ## 0.4.3 — 2026-08-30
 
 ### The cap forbade real presence
