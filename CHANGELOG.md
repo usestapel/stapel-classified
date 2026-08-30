@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.2 — 2026-08-31
+
+Patch on a patch, one number: `stapel-categories>=0.8.2,<0.9` (was `>=0.8.1`).
+
+The reason is metadata, not behaviour. 0.8.2 is where stapel-categories caps
+`stapel-attributes<0.6` instead of `<1.0` — the same cap this composite
+declares. Held at 0.8.1, a resolver may install a categories whose own range
+admits stapel-attributes 0.6, the release that adds a thirteenth built-in type
+(`group`) and moves the discriminator mapping categories emits; categories
+0.8.1's own publish run is where that combination first failed.
+
+Everything 0.5.1 says about the categories floor still holds — see below.
+
 ## 0.5.1 — 2026-08-31
 
 Patch: the member ranges move, nothing about this composite's surface does.

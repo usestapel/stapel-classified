@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.5.1"
+version = "0.5.2"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -137,11 +137,17 @@ dependencies = [
     # duplicate beside it. Matching is `(external_source, external_id)` first
     # now. 0.8.1 is what makes a full catalog import finish at all — the tree
     # cache was rebuilt once per row written, so a 2901-leaf import (3444
-    # categories, 14 409 feature rows) never completed; it is 185 s now. A
+    # categories, 14 409 feature rows) never completed; it is 185 s now.
+    # >=0.8.2 rather than >=0.8.1 for a metadata reason, not a behavioural
+    # one: 0.8.2 is where categories caps `stapel-attributes<0.6` instead of
+    # `<1.0`, which is the same cap this composite declares one line up. Held
+    # at 0.8.1 a resolver may install a categories whose own range admits
+    # attributes 0.6 — the release that adds a thirteenth type and moves the
+    # discriminator mapping categories emits. A
     # composite that mounts stapel-vocabularies exists to carry an imported
     # marketplace catalogue, so a deployment able to resolve back under either
     # of those is a deployment whose declaration does not hold.
-    "stapel-categories>=0.8.1,<0.9",
+    "stapel-categories>=0.8.2,<0.9",
     "stapel-vocabularies>=0.1,<0.2",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
