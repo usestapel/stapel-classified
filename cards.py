@@ -50,6 +50,27 @@ META_OK = "ok"
 META_PARTIAL = "partial"
 
 
+def _card_images(payload: dict) -> list:
+    """The listing's gallery as the card carries it: refs, in the owner's order.
+
+    ``listings.search_documents`` serves the whole gallery and this projection
+    used to take element zero of it — so a result row could never show more
+    than one photo whatever the client was able to draw, and the swipeable
+    strip a phone SERP is made of had exactly one slide. The gallery is the
+    owner's; the only thing decided here is how much of it a CARD is worth,
+    which is ``CARD_IMAGES_LIMIT``: a result row is a glance, and a person who
+    wants photo eleven opens the listing.
+
+    Deduplicated, because two identical refs are two identical slides and a
+    carousel that repeats a picture reads as a broken carousel.
+    """
+    from .conf import classified_settings
+
+    limit = max(1, int(classified_settings.CARD_IMAGES_LIMIT))
+    refs = [str(ref) for ref in (payload.get("images") or []) if ref]
+    return list(dict.fromkeys(refs))[:limit]
+
+
 def _base_card(payload: dict) -> dict:
     """The fields every classified card shows, whatever renders it.
 
@@ -57,14 +78,23 @@ def _base_card(payload: dict) -> dict:
     cannot disagree about what a listing looks like. The display price rides
     along with nothing derived: the written price is what a human reads and
     formatting it is the frontend's job, not a server's guess at a locale.
+
+    ``images`` is the gallery and ``image`` is its first element. Both, not one
+    of them: every reader in and out of this fleet was written against
+    ``image``, the card travels through stores that never validate it
+    (stapel-search keeps it in a JSONField, stapel-chat re-declares it as
+    opaque JSON), and a key removed on the server is a client that renders
+    nothing until it is redeployed. So the singular stays, and it is always
+    ``images[0]`` — never a second answer to the same question.
     """
-    images = payload.get("images") or []
+    images = _card_images(payload)
     return {
         "title": payload.get("title") or "",
         "price": payload.get("price"),
         "currency": payload.get("currency") or "",
         "location_label": payload.get("location_label") or "",
         "image": images[0] if images else None,
+        "images": images,
         "published_at": payload.get("published_at"),
     }
 
@@ -140,6 +170,7 @@ def _gone_card(key: str, *, reachable: bool) -> dict:
         "location_label": "",
         "published_at": None,
         "image": None,
+        "images": [],
         "status": "",
         "moderation_status": "",
         "state": STATE_GONE if reachable else STATE_UNAVAILABLE,
@@ -169,50 +200,98 @@ def _live_card(key: str, document: dict) -> dict:
     return card
 
 
-def _describe_images(cards: dict) -> None:
-    """Merge CDN render metadata over each card's primary image, in one call.
+def _refs_to_describe(cards: dict, budget: int) -> list:
+    """Every card's gallery, flattened PRIMARIES FIRST and capped at *budget*.
 
-    The image stays an opaque ref plus the numbers a UI needs to reserve its
+    Column-major on purpose. ``cdn.describe_many`` takes a bounded batch, and
+    a batch of fifty conversations each carrying ten photos is five hundred
+    refs — so something has to be left out, and the honest order to leave it
+    out in is "everybody's first photo before anybody's second". Row-major
+    would spend the whole budget on the first five cards' galleries and leave
+    the forty-fifth chat header with no thumbnail at all, which is the surface
+    that only ever shows a thumbnail.
+
+    What falls off the end is not dropped: it stays a ref and says
+    ``not_described`` (see :func:`_describe_images`), which is the same
+    sentence this module already used for a ref the CDN answered nothing about.
+    """
+    galleries = [list(card.get("images") or []) for card in cards.values()]
+    depth = max((len(gallery) for gallery in galleries), default=0)
+    ordered: list = []
+    seen: set = set()
+    for position in range(depth):
+        for gallery in galleries:
+            if position >= len(gallery):
+                continue
+            ref = gallery[position]
+            if ref in seen:
+                continue
+            seen.add(ref)
+            ordered.append(ref)
+    return ordered[:budget]
+
+
+def _set_images(card: dict, described: list) -> None:
+    """Both keys, one answer: ``image`` IS ``images[0]``, described the same."""
+    card["images"] = described
+    card["image"] = described[0] if described else None
+
+
+def _describe_images(cards: dict) -> None:
+    """Merge CDN render metadata over each card's images, in one call.
+
+    Every image stays an opaque ref plus the numbers a UI needs to reserve its
     box before the bytes land — ``aspect``, ``preview_b64``, ``variants`` —
     exactly the shape stapel-chat gives an attachment, because it is the same
     CDN answering about the same kind of thing. A card whose CDN read failed
-    keeps the ref and says so; a ref the CDN does not know says that
+    keeps the refs and says so; a ref the CDN does not know says that
     differently, and neither is a broken conversation.
+
+    One call for the whole batch, as before: the gallery grew, the fan-out did
+    not. What the batch could not fit is named by :func:`_refs_to_describe`.
     """
     from .conf import classified_settings
 
-    refs = [c["image"] for c in cards.values() if c.get("image")]
+    budget = int(classified_settings.CONTEXT_BATCH_LIMIT)
+    refs = _refs_to_describe(cards, budget)
     if not refs:
         return
-    refs = list(dict.fromkeys(str(ref) for ref in refs))
 
     answer = _call(
         classified_settings.MEDIA_DESCRIBE_FUNCTION,
-        {"refs": refs[: int(classified_settings.CONTEXT_BATCH_LIMIT)]},
+        {"refs": refs},
         what="cdn.describe_many",
     )
     if answer is None:
         for card in cards.values():
-            if card.get("image"):
-                card["image"] = _image(card["image"], None, reason="cdn_unavailable")
-                card["meta_status"] = META_PARTIAL
-                card["meta_reason"] = card["meta_reason"] or "cdn_unavailable"
+            gallery = list(card.get("images") or [])
+            if not gallery:
+                continue
+            _set_images(
+                card,
+                [_image(ref, None, reason="cdn_unavailable") for ref in gallery],
+            )
+            card["meta_status"] = META_PARTIAL
+            card["meta_reason"] = card["meta_reason"] or "cdn_unavailable"
         return
 
     snapshots = (answer.get("items") if isinstance(answer, dict) else None) or {}
     missing = set((answer.get("missing") if isinstance(answer, dict) else None) or [])
     for card in cards.values():
-        ref = card.get("image")
-        if not ref:
+        gallery = list(card.get("images") or [])
+        if not gallery:
             continue
-        if ref in snapshots:
-            card["image"] = _image(ref, snapshots[ref])
-        elif ref in missing:
-            card["image"] = _image(ref, None, reason="unknown_ref")
-            card["meta_status"] = META_PARTIAL
-            card["meta_reason"] = card["meta_reason"] or "image_unknown_ref"
-        else:
-            card["image"] = _image(ref, None, reason="not_described")
+        described = []
+        for ref in gallery:
+            if ref in snapshots:
+                described.append(_image(ref, snapshots[ref]))
+            elif ref in missing:
+                described.append(_image(ref, None, reason="unknown_ref"))
+                card["meta_status"] = META_PARTIAL
+                card["meta_reason"] = card["meta_reason"] or "image_unknown_ref"
+            else:
+                described.append(_image(ref, None, reason="not_described"))
+        _set_images(card, described)
 
 
 #: Keys a card's image always carries — present, ``null`` where unknown, so a

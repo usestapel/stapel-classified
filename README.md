@@ -10,7 +10,7 @@
 [![license](https://img.shields.io/github/license/usestapel/stapel-classified)](https://github.com/usestapel/stapel-classified/blob/main/LICENSE)
 [![llms.txt](https://img.shields.io/badge/llms.txt-blue)](https://github.com/usestapel/stapel-classified/blob/main/docs/llms.txt)
 
-> Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies, the marketplace reason taxonomy, and (since 0.3.2) the `listing` subject type stapel-chat's registry ships empty of. Its own HTTP surface is a conversation HEADER, assembled from three modules that may not know about each other: chat says who is in the thread and what it is about, listings answers the short card (title, price, primary image with CDN render metadata, and a state that says `available`, `unavailable` or `gone` — exactly the answer a public read cannot give), profiles answers the counterparty. It owns NO table: the binding it kept from 0.2.0 to 0.3.1 existed only because chat could not tell two threads about two listings apart, and it was deleted rather than kept in sync the release chat could. It enforces no block of its own: stapel-chat 0.6.1 holds both write doors (opening a direct thread, sending into one) at the one point every client passes, and this composite's whole contribution is the value `required` it sets on chat's BLOCK_ENFORCEMENT axis in the preset. The pre-creation door it kept until 0.3.x was deleted in 0.4.0, and a deployment that still declares the old STAPEL_CLASSIFIED keys is told so at boot (E003) rather than silently inheriting chat's default.
+> Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies, the marketplace reason taxonomy, and (since 0.3.2) the `listing` subject type stapel-chat's registry ships empty of. Its own HTTP surface is a conversation HEADER, assembled from three modules that may not know about each other: chat says who is in the thread and what it is about, listings answers the short card (title, price, the photo gallery with CDN render metadata, and a state that says `available`, `unavailable` or `gone` — exactly the answer a public read cannot give), profiles answers the counterparty. It owns NO table: the binding it kept from 0.2.0 to 0.3.1 existed only because chat could not tell two threads about two listings apart, and it was deleted rather than kept in sync the release chat could. It enforces no block of its own: stapel-chat 0.6.1 holds both write doors (opening a direct thread, sending into one) at the one point every client passes, and this composite's whole contribution is the value `required` it sets on chat's BLOCK_ENFORCEMENT axis in the preset. The pre-creation door it kept until 0.3.x was deleted in 0.4.0, and a deployment that still declares the old STAPEL_CLASSIFIED keys is told so at boot (E003) rather than silently inheriting chat's default.
 
 Part of the [Stapel framework](https://github.com/usestapel) — composable Django apps that deploy as a monolith or as microservices without changing module code.
 
@@ -24,7 +24,7 @@ pip install stapel-classified
 
 | Fact | Value |
 |---|---|
-| Version | `0.6.2` |
+| Version | `0.7.0` |
 | Python | `>=3.11` (3.11, 3.12, 3.13, 3.14) |
 | HTTP operations | 3 |
 | Config axes | 3 |
@@ -125,8 +125,8 @@ GET  /classified/api/v1/conversations/{id}      one header
 POST /classified/api/v1/conversations/contexts  a page of them, for the inbox
 ```
 
-A header carries the **short listing card** — title, price, primary image
-with CDN render metadata, and a `state` of `available` / `unavailable`
+A header carries the **short listing card** — title, price, the photo
+gallery with CDN render metadata over every frame, and a `state` of `available` / `unavailable`
 (sold, paused, expired) / `gone`, which is the answer a public listing read
 cannot give and exactly the case a buyer is most confused by — plus the
 **counterparty's public seller card**. Never more of a person than their

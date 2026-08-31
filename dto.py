@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class CardImageDTO:
-    """The card's primary image: an opaque CDN ref plus what a UI needs to
+    """One of the card's images: an opaque CDN ref plus what a UI needs to
     reserve its box before the bytes arrive. Same fields, same meanings and
     same source (``cdn.describe_many``) as a stapel-chat attachment."""
 
@@ -42,6 +42,12 @@ class ListingCardDTO:
     live) and ``gone`` (deleted). A buyer is most confused exactly when the
     thing is no longer on sale, and that is the case a public 404 cannot
     express.
+
+    ``images`` is the gallery, in the seller's own order and capped at
+    ``CARD_IMAGES_LIMIT``; ``image`` is its first element and exists because
+    every client written before the gallery did reads that key. They are one
+    answer, never two: ``image`` is always ``images[0]`` and both carry the
+    same CDN render metadata.
     """
 
     listing_id: str = ""
@@ -51,6 +57,7 @@ class ListingCardDTO:
     location_label: str = ""
     published_at: Optional[str] = None
     image: Optional[CardImageDTO] = None
+    images: List[CardImageDTO] = field(default_factory=list)
     status: str = ""
     moderation_status: str = ""
     state: str = "available"

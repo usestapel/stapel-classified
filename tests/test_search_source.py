@@ -345,3 +345,119 @@ def test_datetime_conversion_passes_through_an_already_parsed_value():
     assert _datetime(when) is when
     assert _datetime("") is None
     assert _datetime("2026-01-01T00:00:00+00:00") == when
+
+
+# ── the gallery a result row can swipe ───────────────────────────────
+#
+# The projection was the ceiling, not the client: `_card` stored `images[0]`
+# and nothing else, so a SERP row had exactly one photo however swipeable the
+# card drawing it was. These run the whole real path — publish, the
+# `listing.published` fact, the pull over `listings.search_documents`, the
+# stored document, the HTTP query — because the claim is about what a result
+# row CARRIES, and only the far end of that path can answer it.
+
+
+def _publish_with(make_listing, refs):
+    from stapel_listings.services.publish import publish_listing
+
+    listing = make_listing(images_draft=list(refs))
+    publish_listing(listing)
+    listing.apply_moderation("approved")
+    listing.refresh_from_db()
+    return listing
+
+
+@pytest.mark.parametrize("count", [1, 3, 10])
+def test_a_result_row_carries_the_whole_gallery(make_listing, count):
+    refs = [f"product/photo-{i}" for i in range(count)]
+    listing = _publish_with(make_listing, refs)
+
+    hit = _query()["items"][0]
+    assert hit["key"] == str(listing.pk)
+    # Order is the seller's own, and it is preserved: photo one is the one
+    # they put first, which is the one the strip opens on.
+    assert hit["card"]["images"] == refs
+
+
+@pytest.mark.parametrize("count", [1, 3, 10])
+def test_the_singular_key_still_answers_for_every_client_that_reads_it(
+    make_listing, count
+):
+    """`image` did not move: it is `images[0]`, described the same way.
+
+    The card travels through stores that never validate it — stapel-search
+    keeps it in a JSONField, stapel-chat re-declares it as opaque JSON — so a
+    key removed here is a client rendering nothing until it is redeployed.
+    """
+    refs = [f"product/photo-{i}" for i in range(count)]
+    _publish_with(make_listing, refs)
+
+    card = _query()["items"][0]["card"]
+    assert card["image"] == card["images"][0] == refs[0]
+
+
+def test_a_listing_with_no_photo_carries_an_empty_gallery(published_listing):
+    card = _query()["items"][0]["card"]
+    assert card["images"] == []
+    assert card["image"] is None
+
+
+def test_the_gallery_is_capped_so_a_stored_card_cannot_grow_without_bound(
+    make_listing,
+):
+    """A card is a glance. Photo eleven is a reason to open the listing."""
+    from stapel_classified.conf import classified_settings
+
+    limit = int(classified_settings.CARD_IMAGES_LIMIT)
+    refs = [f"product/photo-{i}" for i in range(limit + 2)]
+    _publish_with(make_listing, refs)
+
+    assert _query()["items"][0]["card"]["images"] == refs[:limit]
+
+
+def test_one_ref_twice_is_one_slide(make_listing):
+    """A carousel that repeats a picture reads as a broken carousel."""
+    _publish_with(make_listing, ["product/a", "product/b", "product/a"])
+
+    assert _query()["items"][0]["card"]["images"] == ["product/a", "product/b"]
+
+
+def test_the_stored_card_carries_refs_and_never_a_render_snapshot(make_listing):
+    """The rebuild path must not fan out to the CDN once per row.
+
+    The conversation header merges `cdn.describe_many` over its cards because
+    it renders one header now; a snapshot frozen into a stored document goes
+    stale the first time the CDN re-encodes anything, and a rebuild that asked
+    per row would make a corpus-sized reindex a corpus-sized CDN load.
+    """
+    _publish_with(make_listing, ["product/a", "product/b"])
+
+    card = _query()["items"][0]["card"]
+    assert card["images"] == ["product/a", "product/b"]
+    assert all(isinstance(ref, str) for ref in card["images"])
+
+
+# ── which refs a bounded describe batch spends itself on ─────────────
+
+
+def test_a_bounded_describe_batch_buys_every_primary_before_any_second():
+    """Column-major, and the reason is the chat inbox.
+
+    `cdn.describe_many` takes a bounded batch. Fifty conversations each
+    carrying ten photos is five hundred refs, so something is left out — and
+    the honest order to leave it out in is everybody's first photo before
+    anybody's second. Row-major would spend the budget on the first cards'
+    galleries and leave the last header with no thumbnail at all, which is
+    the surface that only ever shows a thumbnail.
+    """
+    from stapel_classified.cards import _refs_to_describe
+
+    cards = {
+        "1": {"images": ["a1", "a2", "a3"]},
+        "2": {"images": ["b1", "b2"]},
+        "3": {"images": ["c1"]},
+    }
+    assert _refs_to_describe(cards, 4) == ["a1", "b1", "c1", "a2"]
+    # Nothing is asked about twice, and the budget is a ceiling, not a target.
+    assert _refs_to_describe(cards, 99) == ["a1", "b1", "c1", "a2", "b2", "a3"]
+    assert _refs_to_describe({}, 10) == []

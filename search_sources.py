@@ -161,6 +161,16 @@ def _card(payload: dict) -> dict:
     also builds on: a search hit and a chat header showing the same listing
     differently would be two answers to one question, and one of them would
     be wrong on the day somebody edited only one of the two builders.
+
+    **Images ride as REFS here, not as described objects.** The conversation
+    header merges ``cdn.describe_many`` over its cards because it is rendering
+    one header now; a rebuild indexing a whole corpus must not fan out to the
+    CDN once per row, and a render snapshot frozen into a stored document
+    would go stale the first time the CDN re-encoded anything. So the stored
+    card carries ``images`` — the gallery, capped, in the seller's order — and
+    the client resolves a ref the way it resolves every other ref in this
+    fleet. Until 0.7.0 it carried one, which is why a SERP row could not show
+    a second photo however swipeable the card was.
     """
     from .cards import _base_card
 

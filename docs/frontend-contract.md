@@ -182,6 +182,7 @@ list, its order and its unread counts.
                        "width": 240, "height": 160 }],
         "meta_status": "ok", "meta_reason": null
       },
+      "images": [ /* the gallery, same object shape, images[0] === image */ ],
       "meta_status": "ok", "meta_reason": null
     }
   },
@@ -231,6 +232,27 @@ attachment renderer:
 - `image: null` means the listing has no picture. `meta_status: "missing"`
   with `meta_reason: "unknown_ref"` means the CDN does not know this ref —
   draw the empty-image placeholder, not a broken one.
+
+### 3.2.1 `images` is the gallery; `image` is its first frame
+
+Since 0.7.0 the card carries **`images`** — the seller's own photo order,
+capped at `CARD_IMAGES_LIMIT` (10 by default) — in exactly the object shape
+described above. `image` did not move and did not change meaning: it is
+`images[0]`, so a client written before the gallery existed keeps working and
+a client drawing a swipeable strip has something to draw.
+
+- `images: []` and `image: null` are the same fact: this listing has no
+  picture.
+- A batch that outruns the CDN's `describe_many` budget spends it on every
+  card's FIRST photo before anybody's second, so a thumbnail is never starved
+  by another card's tenth frame. What did not fit keeps its `ref` and says
+  `meta_reason: "not_described"` — measurable enough to link, not enough to
+  reserve a box for.
+- **The stored SEARCH card carries plain string refs, not these objects.** A
+  rebuild indexes a whole corpus and must not ask the CDN once per row, and a
+  render snapshot frozen into a stored document goes stale the first time the
+  CDN re-encodes anything. Resolve those refs the way you resolve any other
+  CDN ref.
 
 ### 3.3 `meta_status` on the counterparty
 

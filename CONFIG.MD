@@ -28,8 +28,9 @@ own provider and the answer changes with no fork.
 | PUBLIC_PROFILE_FUNCTION | env | Avatar (fleet image object), member-since (date), seller type — served by stapel-profiles >= 0.16.0 as `profiles.public_cards`. Set `""` on a deployment without profiles: the counterparty card then answers `meta_status: partial`. | no | `profiles.public_cards` |
 | SELLER_RATING_FUNCTION | env | The rating aggregate for a seller card. | no | `reviews.aggregate` |
 | SELLER_RATING_TARGET_TYPE | env | The reviews target type a seller's rating is keyed under. Empty = this deployment has no seller reviews, and the card says `rating: null` rather than inventing a zero. | no | `""` |
-| MEDIA_DESCRIBE_FUNCTION | env | CDN render metadata for the card's primary image — the same contract stapel-chat uses for an attachment. | no | `cdn.describe_many` |
+| MEDIA_DESCRIBE_FUNCTION | env | CDN render metadata for every image on a card — the same contract stapel-chat uses for an attachment. One batched call per page of cards, spent on every card's first photo before anybody's second. | no | `cdn.describe_many` |
 | CARD_IMAGE_TIER | env | Widest CDN variant a card asks about. | no | `480` |
+| CARD_IMAGES_LIMIT | env | How many of a listing's photos a card carries (`images`). The gallery is the listing's; this is the only thing a card decides about it. A result row is a glance — the person who wants photo eleven opens the listing. | no | `10` |
 | LISTING_URL_TEMPLATE | env | `{listing_id}` template for the card's public link. Empty = no link rather than an invented one. | no | `""` |
 | SELLER_URL_TEMPLATE | env | `{user_id}` template for the seller card's public link. | no | `""` |
 | CONTEXT_BATCH_LIMIT | env | Conversations resolved in one batch call (the inbox page). Kept at stapel-cdn's own describe_many ceiling. | no | `50` |

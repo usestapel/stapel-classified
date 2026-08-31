@@ -178,7 +178,13 @@ def test_the_card_is_typed_field_by_field():
     for name in ("ListingCardDTO", "SellerCardDTO", "CardImageDTO", "SubjectDTO"):
         assert name in comps, f"{name} is missing from the emitted components"
     listing = comps["ListingCardDTO"]["properties"]
-    assert {"state", "status", "price", "currency", "image"} <= set(listing)
+    assert {"state", "status", "price", "currency", "image", "images"} <= set(listing)
+    # The gallery is typed as a LIST OF THE SAME image, not as a free-form
+    # array: a client that renders `image` must be able to render every frame
+    # of `images` with the identical renderer, and that is what makes the two
+    # keys one answer instead of two.
+    assert listing["images"]["type"] == "array"
+    assert listing["images"]["items"]["$ref"].endswith("/CardImageDTO")
 
 
 def test_errors_json_describes_this_library_not_this_machine():

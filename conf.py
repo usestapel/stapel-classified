@@ -72,6 +72,13 @@ DEFAULTS = {
     # Widest CDN variant a card asks about. A card is a thumbnail; a client
     # that wants the gallery opens the listing.
     "CARD_IMAGE_TIER": 480,
+    # How many of a listing's photos a CARD carries. The gallery belongs to
+    # the listing and this is the only thing decided here: a result row is a
+    # glance, and the person who wants photo eleven opens the listing. Ten is
+    # what a swipeable SERP strip is worth — below that a phone card runs out
+    # of photos mid-swipe, above it the stored card grows for slides nobody
+    # reaches. Tuning, deliberately not an axis.
+    "CARD_IMAGES_LIMIT": 10,
     # Template for the public listing URL a moderator's card links to.
     "LISTING_URL_TEMPLATE": "",
     # Template for the public seller URL a moderator's card links to.

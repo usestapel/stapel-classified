@@ -253,6 +253,65 @@ def test_the_primary_image_carries_cdn_render_metadata(
     assert image["variants"][0]["tier"] == 240
 
 
+def test_every_photo_in_the_gallery_carries_cdn_render_metadata(
+    make_listing, other_user, user, thread, cdn_double
+):
+    """The gallery, not only its first frame — and in one call, not per photo.
+
+    A header shows one thumbnail today, so the reason this is asserted here is
+    the OTHER reader of the same builder: a SERP row that swipes. One builder
+    means a card cannot describe three photos in search and one in chat.
+    """
+    refs = ["product/a", "product/b", "product/c"]
+    listing = _publish(make_listing(images_draft=refs))
+    for index, ref in enumerate(refs):
+        cdn_double["items"][ref] = {
+            "mime": "image/webp",
+            "width": 1200,
+            "height": 800,
+            "aspect": 1.5,
+            "preview_b64": f"data:image/webp;base64,{index}",
+            "preview_kind": "blur",
+            "variants": [
+                {"tier": 240, "branch": "w", "url": "u", "width": 240, "height": 160}
+            ],
+            "meta_status": "ok",
+        }
+    conversation = thread(other_user, user, listing)
+
+    card = services.conversation_context(conversation.id, viewer_id=other_user.pk)[
+        "subject"
+    ]["listing"]
+    assert [image["ref"] for image in card["images"]] == refs
+    assert all(image["aspect"] == 1.5 for image in card["images"])
+    assert card["images"][2]["preview_b64"].endswith("2")
+    # One answer, not two: the singular key IS the first element.
+    assert card["image"] == card["images"][0]
+    assert card["meta_status"] == "ok"
+    # And one CDN round trip for the whole gallery, not one per photo.
+    assert len(cdn_double["calls"]) == 1
+    assert cdn_double["calls"][0]["refs"] == refs
+
+
+def test_a_photo_the_cdn_does_not_know_degrades_that_slide_only(
+    make_listing, other_user, user, thread, cdn_double
+):
+    """Degradation is per image and it is data — the rest of the strip draws."""
+    listing = _publish(make_listing(images_draft=["product/a", "product/gone"]))
+    cdn_double["items"]["product/a"] = {"aspect": 1.5, "meta_status": "ok"}
+    cdn_double["missing"].append("product/gone")
+    conversation = thread(other_user, user, listing)
+
+    card = services.conversation_context(conversation.id, viewer_id=other_user.pk)[
+        "subject"
+    ]["listing"]
+    assert card["images"][0]["meta_status"] == "ok"
+    assert card["images"][1]["meta_status"] == "missing"
+    assert card["images"][1]["ref"] == "product/gone"
+    assert card["meta_status"] == "partial"
+    assert card["meta_reason"] == "image_unknown_ref"
+
+
 def test_an_unreachable_cdn_degrades_the_card_and_never_the_conversation(
     make_listing, other_user, user, thread
 ):
@@ -266,6 +325,10 @@ def test_an_unreachable_cdn_degrades_the_card_and_never_the_conversation(
     assert card["meta_status"] == "partial"
     assert card["meta_reason"] == "cdn_unavailable"
     assert card["image"]["ref"] == "product/abc"
+    # Every slide keeps its ref and says why it has no numbers — a strip that
+    # cannot measure itself is still a strip a person can swipe.
+    assert [image["ref"] for image in card["images"]] == ["product/abc"]
+    assert card["images"][0]["meta_reason"] == "cdn_unavailable"
     assert card["title"] == "Apple iPhone 13 Pro"
 
 

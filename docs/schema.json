@@ -139,7 +139,7 @@
     "schemas": {
       "CardImageDTO": {
         "type": "object",
-        "description": "The card's primary image: an opaque CDN ref plus what a UI needs to\nreserve its box before the bytes arrive. Same fields, same meanings and\nsame source (``cdn.describe_many``) as a stapel-chat attachment.",
+        "description": "One of the card's images: an opaque CDN ref plus what a UI needs to\nreserve its box before the bytes arrive. Same fields, same meanings and\nsame source (``cdn.describe_many``) as a stapel-chat attachment.",
         "properties": {
           "ref": {
             "type": "string"
@@ -286,7 +286,7 @@
       },
       "ListingCardDTO": {
         "type": "object",
-        "description": "The short listing card a conversation header shows.\n\n``state`` is the field this whole wave exists for: ``available``,\n``unavailable`` (paused, expired, sold, blocked — it exists and is not\nlive) and ``gone`` (deleted). A buyer is most confused exactly when the\nthing is no longer on sale, and that is the case a public 404 cannot\nexpress.",
+        "description": "The short listing card a conversation header shows.\n\n``state`` is the field this whole wave exists for: ``available``,\n``unavailable`` (paused, expired, sold, blocked — it exists and is not\nlive) and ``gone`` (deleted). A buyer is most confused exactly when the\nthing is no longer on sale, and that is the case a public 404 cannot\nexpress.\n\n``images`` is the gallery, in the seller's own order and capped at\n``CARD_IMAGES_LIMIT``; ``image`` is its first element and exists because\nevery client written before the gallery did reads that key. They are one\nanswer, never two: ``image`` is always ``images[0]`` and both carry the\nsame CDN render metadata.",
         "properties": {
           "listing_id": {
             "type": "string"
@@ -315,6 +315,12 @@
               }
             ],
             "nullable": true
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CardImageDTO"
+            }
           },
           "status": {
             "type": "string"

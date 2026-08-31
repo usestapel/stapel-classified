@@ -86,8 +86,8 @@ GET  /classified/api/v1/conversations/{id}      one header
 POST /classified/api/v1/conversations/contexts  a page of them, for the inbox
 ```
 
-A header carries the **short listing card** — title, price, primary image
-with CDN render metadata, and a `state` of `available` / `unavailable`
+A header carries the **short listing card** — title, price, the photo
+gallery with CDN render metadata over every frame, and a `state` of `available` / `unavailable`
 (sold, paused, expired) / `gone`, which is the answer a public listing read
 cannot give and exactly the case a buyer is most confused by — plus the
 **counterparty's public seller card**. Never more of a person than their

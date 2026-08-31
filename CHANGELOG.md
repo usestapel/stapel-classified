@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.7.0 — 2026-08-31
+
+### A card carries the GALLERY — a SERP row can finally be swiped
+
+`_base_card` projected `images[0]` and threw the rest away, so every surface
+built on it — the stored search document, the conversation header — could show
+exactly one photo. The card, not the client, was the ceiling: the phone SERP
+card in `@stapel/listings-react` has drawn a `<SkinCarousel>` since it shipped,
+and the reference design's swipeable strip had one slide on live data because
+the projection sent one ref. The detail page peeked correctly the whole time,
+because it reads the listing and the listing has always had the gallery.
+
+- **`images` on every classified card.** The seller's own photo order, capped
+  at the new `CARD_IMAGES_LIMIT` (10), deduplicated — two identical refs are
+  two identical slides. Same object shape as `image` on the header card; plain
+  string refs in the stored search card, for the reason below.
+- **`image` did not move.** It is `images[0]`, always, and it stays because
+  the card travels through stores that never validate it (stapel-search keeps
+  it in a JSONField, stapel-chat re-declares it as opaque JSON) and readers
+  outside this repo were written against it. Additive on the wire: nothing has
+  to be redeployed to keep working, and `images` is there for whoever wants
+  the strip. `images: []` and `image: null` are the same fact.
+- **The CDN batch is spent primaries-first.** `cdn.describe_many` takes a
+  bounded batch and fifty conversations × ten photos is five hundred refs, so
+  the flattening is column-major: everybody's first photo before anybody's
+  second. A chat inbox — the surface that only ever shows a thumbnail — can no
+  longer be starved of one by another card's tenth frame. Still ONE call per
+  page of cards; the gallery grew, the fan-out did not. What the budget did not
+  reach keeps its ref and says `meta_reason: "not_described"`.
+- **The stored search card carries refs, never a render snapshot.** A rebuild
+  indexes a corpus and must not ask the CDN once per row, and a snapshot frozen
+  into a stored document goes stale the first time the CDN re-encodes anything.
+  Unchanged behaviour, now written down in `search_sources._card`.
+
+`CARD_IMAGES_LIMIT` is tuning, not an axis (like `CARD_IMAGE_TIER` and
+`CONTEXT_BATCH_LIMIT` beside it): it does not change what the product does to
+anyone, only how much of a gallery a glance is worth.
+
+**A deployment must reindex.** Existing search documents keep the card they
+were stored with — `stapel_search.services.index_documents` rewrites `card`
+only when a document is re-indexed — so the SERP keeps showing one photo until
+`manage.py search_rebuild --type listing` has run. The rebuild is not blocked
+by the seq guard (equal `seq` re-indexes; only a strictly older one is skipped),
+so no listing has to be touched to make it take.
+
+No migration. No member pin moves: this is one projection and its contract.
+
 ## 0.6.2 — 2026-08-31
 
 ### The type-ahead offers PLACES — pins only, no code
