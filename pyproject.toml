@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.5.4"
+version = "0.6.0"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -126,7 +126,16 @@ dependencies = [
     # usual reason — a fleet able to resolve back onto 0.5 is a fleet whose
     # catalogue silently loses those fields again — and because the two
     # members below now require it themselves.
-    "stapel-attributes>=0.6,<0.7",
+    # >=0.7,<0.8 as of 0.6.0, and the floor moves with the cap for the reason
+    # this block has now given four times. 0.7.0 makes an inline `select`'s
+    # stored DAO carry the option LABELS beside the values, the way `ref_select`
+    # has carried them since 0.5. It is a write-time snapshot, so a deployment
+    # able to resolve back onto 0.6 publishes listings whose display copy is
+    # gone at the moment of writing, where no reader can repair it — which is
+    # exactly the screen this release was cut for: «Состояние: b-u», «Датчики:
+    # gps», «Состояние экрана: bez-defektov» on live cards, and an index whose
+    # only match for the word a buyer types was the description text.
+    "stapel-attributes>=0.7,<0.8",
     # >=0.4, not >=0.2: 0.4.0 is where ALLOW_ANONYMOUS_WRITES exists at all.
     # A fleet that declares it under the old range gets an inert setting, so
     # the floor moves with the cap rather than leaving a deployment able to
@@ -150,7 +159,11 @@ dependencies = [
     # >=0.2.10: 0.2.10 is where shop's own reviews cap becomes <0.6. Held at
     # 0.2.9 (cap <0.5) the reviews line above has no solution — the same
     # ResolutionImpossible this composite has now walked into five times.
-    "stapel-shop>=0.2.10,<0.3",
+    # >=0.2.12: 0.2.11 widened shop's attributes cap to <0.8 and that alone was
+    # inert — shop still capped `stapel-listings<0.11`, so the listings line
+    # below had no solution and pip resolved attributes back to 0.6.2 rather
+    # than failing. The sixth instance of this exact shape in this block.
+    "stapel-shop>=0.2.12,<0.3",
     # >=0.8.1,<0.9, and the floor moves with the cap for the usual reason.
     # 0.8.0 stops keying a catalog re-import on the SLUG: an imported
     # category's slug comes from the source catalogue's node path, so a
@@ -177,7 +190,7 @@ dependencies = [
     # (they are not catalog rows, so nothing else reaches their labels), and
     # the ResolvedFeature gate covers the one config that carries FeatureDefs
     # inside it.
-    "stapel-categories>=0.8.3,<0.9",
+    "stapel-categories>=0.8.4,<0.9",
     "stapel-vocabularies>=0.1,<0.2",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
@@ -189,14 +202,26 @@ dependencies = [
     # still declaring a floor of 0.5, so its own contract test fails on the
     # range it advertises; 0.10.2 states >=0.6,<0.7, which is the range this
     # composite now declares one member up.
-    "stapel-listings>=0.10.2,<0.11",
+    # >=0.11,<0.12: 0.11.0 declares the attributes range above, and it carries
+    # `listings_reproject_features` — the command that re-derives the four
+    # projections from the stored draft and the CURRENT category schema. A
+    # write-time snapshot has no other way to become true again, and every
+    # listing published before attributes 0.7.0 is a stale one.
+    "stapel-listings>=0.11,<0.12",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for
     # latitude and longitude. Nothing here imports stapel_geo — the preset only mounts
     # it (preset.py:25,52) — so the range is the whole coupling.
     "stapel-geo>=0.2,<0.5",
-    "stapel-search>=0.3.1,<0.4",
+    # >=0.6,<0.7. Three releases this composite's own source module depends on:
+    # 0.4.0 makes `r.price` a real filter axis and ships facet captions for
+    # inline options; 0.5.0 adds the cross-script conformance scenario; 0.6.0
+    # captions the vocabulary-backed facets too, through the same
+    # stapel-attributes resolver this composite already registers — which is
+    # what stops a panel reading «Состояние: Б/у» directly above
+    # «Производитель: apple».
+    "stapel-search>=0.6,<0.7",
     # >=0.4, not >=0.3: 0.4.0 is where stapel_moderation subscribes
     # 'user.merged' — a merge re-parents the reports and decisions an account
     # holds, and an app that only knows 'user.deleted' strands them. Under

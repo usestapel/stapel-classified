@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.6.0 — 2026-08-31
+
+### The index holds the word a buyer types, not the slug a form stored
+
+`_title_text` took a title chip's text from `features_search` for every type
+except the two vocabulary-backed ones, which carry a `labels` snapshot beside
+their codes. An inline `select` has the same shape of problem and had no
+snapshot to take, so what reached `text_extra` was the storage value: `b-u`,
+`prodayu-svoe`, `bez-defektov`, `gps`. Measured on a live board — the only
+listings answering «б/у» were the two that happened to spell it in the
+description.
+
+- **`REF_TYPES` is now `LABEL_SNAPSHOT_TYPES`, and `select` is in it.** The set
+  was always a statement about the DAO SHAPE — a code in `value`, the copy in
+  `labels` — and never about where the copy came from. A vocabulary term and an
+  inline option are the same problem for a reader. The rename is why this is a
+  minor: the name was in `__all__` and it had become untrue.
+- The fallback is unchanged and now covers one more case: a DAO with no
+  `labels` — written before the vocabulary answered, or before
+  stapel-attributes 0.7.0 taught `select` to snapshot at all — still takes its
+  codes rather than dropping the attribute out of the text arm. Every listing
+  published before that release is such a row until it is re-projected.
+- `features_search` is untouched. Codes are the filter axis; an existing
+  `f.condition=b-u` keeps matching, and the panel's captions come from
+  stapel-search's `facet_labels`, which is the other end of the same fix.
+
+### The ranges that make the fix reachable
+
+Five members move, and every floor moves with its cap for the reason this
+package's dependency block has now recorded six times: a deployment able to
+resolve back under the version that carries the behaviour is a deployment
+whose declaration does nothing, and pip reports that as a successful install.
+
+`stapel-attributes>=0.7,<0.8` (the write-side label snapshot),
+`stapel-listings>=0.11,<0.12` (which declares that range itself and carries
+`listings_reproject_features`, the only way a write-time snapshot becomes true
+again), `stapel-search>=0.6,<0.7` (price as a filter axis, the cross-script
+conformance scenario, and captions for the vocabulary-backed facets),
+`stapel-categories>=0.8.4` and `stapel-shop>=0.2.12` — the two cap moves that
+the attributes and listings lines have no solution without.
+
 ## 0.5.4 — 2026-08-31
 
 Five member floors move. This composite's own surface does not, and no code in

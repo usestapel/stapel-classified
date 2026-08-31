@@ -36,9 +36,9 @@ on by default); closing it is one field in listings' document builder, and it
 is named as such in this composite's CHANGELOG.
 
 The one place DAOs *are* read is ``_title_text``, and since 0.5.0 it reads
-one field off them: a vocabulary-backed value's ``labels``. That is not the
-DAO path reopened — ``features_title`` is served, it is a DAO list by
-contract, and the display half of a ref value exists nowhere else.
+one field off them: a code-valued attribute's ``labels`` snapshot. That is not
+the DAO path reopened — ``features_title`` is served, it is a DAO list by
+contract, and the display half of a code exists nowhere else.
 """
 from __future__ import annotations
 
@@ -80,14 +80,23 @@ def _datetime(value: Any):
     return parse_datetime(value)
 
 
-#: Attribute types whose stored ``value`` is a list of term CODES and whose
-#: display half is a separate ``labels`` snapshot on the same DAO
-#: (stapel-attributes 0.5: ``ref_select`` / ``ref_hierarchical_select``).
+#: Attribute types whose stored ``value`` is a list of CODES and whose display
+#: half is a separate ``labels`` snapshot on the same DAO.
+#:
 #: Named here for the same reason listings names them in ``_LIST_VALUE_TYPES``
 #: rather than letting them fall through a generic branch — a code is not a
 #: word a human ever typed, so a code in the text arm is a chip nobody can
 #: read and a query nobody can match.
-REF_TYPES = frozenset({"ref_select", "ref_hierarchical_select"})
+#:
+#: ``ref_select`` / ``ref_hierarchical_select`` have carried the snapshot since
+#: stapel-attributes 0.5; ``select`` joins them at 0.7.0, which is the release
+#: that stopped a plain select from throwing its option copy away. The set is a
+#: statement about the DAO shape, not about where the copy came from: a
+#: vocabulary term and an inline option are the same problem for a reader, and
+#: on a live board they produced the same symptom — a search whose only match
+#: for «б/у» was the two listings that happened to type it in the description,
+#: because the index held ``b-u``.
+LABEL_SNAPSHOT_TYPES = frozenset({"ref_select", "ref_hierarchical_select", "select"})
 
 
 def _title_text(payload: dict) -> tuple[str, ...]:
@@ -99,17 +108,19 @@ def _title_text(payload: dict) -> tuple[str, ...]:
     is searchable about an attribute" (listings'), instead of re-deriving
     values from DAOs here and letting the two drift.
 
-    **Except for the vocabulary-backed types, where the two halves are
-    different things on purpose.** A ``ref_select`` DAO carries ``value`` (the
-    term codes, which is the filter axis and what ``features_search`` serves)
-    AND ``labels`` (the display snapshot taken at write time). The chip a
-    person reads on a result row is "iPhone 10", not ``iphone-10``, and the
-    query a person types is the label too — so for those types the text arm
-    takes ``labels``. Nothing is re-derived: the label snapshot is the owner's,
-    stored beside the codes at publish time, and ``features_search`` below
-    still carries the codes untouched. Empty ``labels`` (a DAO written before
-    the vocabulary answered) falls back to the codes rather than dropping the
-    attribute out of the text arm.
+    **Except for the code-valued types, where the two halves are different
+    things on purpose.** A DAO in :data:`LABEL_SNAPSHOT_TYPES` carries
+    ``value`` (the codes, which are the filter axis and what
+    ``features_search`` serves) AND ``labels`` (the display snapshot taken at
+    write time). The chip a person reads on a result row is "iPhone 10", not
+    ``iphone-10``, and «Б/у», not ``b-u`` — and the query a person types is the
+    label too — so for those types the text arm takes ``labels``. Nothing is
+    re-derived: the label snapshot is the owner's, stored beside the codes at
+    publish time, and ``features_search`` below still carries the codes
+    untouched. Absent ``labels`` — a DAO written before the vocabulary
+    answered, or before stapel-attributes 0.7.0 taught ``select`` to snapshot
+    at all — falls back to the codes rather than dropping the attribute out of
+    the text arm.
 
     DAO order is the category's own feature order, and it is preserved:
     ``text_extra`` is compared field-by-field in the rebuild-vs-live gate, and
@@ -127,7 +138,7 @@ def _title_text(payload: dict) -> tuple[str, ...]:
     text: list[str] = []
     for dao in daos:
         values = None
-        if str(dao.get("type") or "") in REF_TYPES:
+        if str(dao.get("type") or "") in LABEL_SNAPSHOT_TYPES:
             labels = dao.get("labels")
             if isinstance(labels, list) and labels:
                 values = labels
@@ -231,7 +242,7 @@ def listing_source():
 __all__ = [
     "CONTENT_FUNCTION",
     "EXPORT_FUNCTION",
-    "REF_TYPES",
+    "LABEL_SNAPSHOT_TYPES",
     "REMOVAL_SIGNALS",
     "SIGNALS",
     "listing_source",

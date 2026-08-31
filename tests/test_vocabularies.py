@@ -298,3 +298,65 @@ def test_non_ref_title_chips_still_come_from_features_search():
     }
     # DAO order is preserved — the category's feature order, not a set's.
     assert _title_text(payload) == ("apple", "Apple")
+
+
+def test_an_inline_select_reaches_the_index_as_its_option_copy():
+    """The same defect one type over, measured live on a classified board.
+
+    An inline ``select`` stores the option's VALUE — a slug of its label —
+    and until stapel-attributes 0.7.0 the DAO carried nothing else. So the
+    index held ``b-u`` and ``bez-defektov``: a result row a buyer could not
+    read, and a word no buyer would ever type. The only listings answering
+    «б/у» were the two that happened to spell it in the description.
+    """
+    from stapel_classified.search_sources import _title_text
+
+    payload = {
+        "features_title": [
+            {"slug": "condition", "type": "select", "value": ["b-u"], "labels": ["Б/у"]},
+            {
+                "slug": "screen_condition",
+                "type": "select",
+                "value": ["bez-defektov"],
+                "labels": ["Без дефектов"],
+            },
+        ],
+        "features_search": {
+            "condition": ["b-u"],
+            "screen_condition": ["bez-defektov"],
+        },
+    }
+    assert _title_text(payload) == ("Б/у", "Без дефектов")
+
+
+def test_a_select_dao_written_before_the_snapshot_falls_back_to_its_values():
+    """Every listing published before stapel-attributes 0.7.0 is this row.
+
+    The index degrades to what it always held rather than losing the
+    attribute, and a re-projection is what upgrades it — the same rule the
+    ref types have had since 0.5.0.
+    """
+    from stapel_classified.search_sources import _title_text
+
+    payload = {
+        "features_title": [{"slug": "condition", "type": "select", "value": ["b-u"]}],
+        "features_search": {"condition": ["b-u"]},
+    }
+    assert _title_text(payload) == ("b-u",)
+
+
+def test_a_multiselect_keeps_every_option_and_its_order():
+    from stapel_classified.search_sources import _title_text
+
+    payload = {
+        "features_title": [
+            {
+                "slug": "sensors",
+                "type": "select",
+                "value": ["gps", "wi-fi"],
+                "labels": ["GPS", "Wi-Fi"],
+            }
+        ],
+        "features_search": {"sensors": ["gps", "wi-fi"]},
+    }
+    assert _title_text(payload) == ("GPS", "Wi-Fi")
