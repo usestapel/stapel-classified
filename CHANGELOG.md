@@ -1,8 +1,13 @@
 # Changelog
 
-## 0.6.1 — 2026-08-31
+## 0.6.2 — 2026-08-31
 
 ### The type-ahead offers PLACES — pins only, no code
+
+0.6.1 carried the same three pins and never published: `docs/capabilities.json`
+was left describing 0.6.0 and the drift gate refused the release — correctly,
+since a contract artifact that lags the package it describes is what the gate
+is for.
 
 Patch: no model, migration, view, preset or code change. Three lines move so
 that a classified deployment can install the pair that makes a search box a
@@ -24,7 +29,7 @@ and the number of live listings behind it.
   deployment able to resolve back onto 0.8 gets the endpoint, gets
   `search.W008`, and gets no categories — a declaration that resolves to a
   permanent degradation is a declaration that does nothing.
-- **`stapel-shop>=0.2.12` → `>=0.2.13`.** The release that widens shop's own
+- **`stapel-shop>=0.2.12` → `>=0.2.14`.** The release that widens shop's own
   `stapel-categories<0.9`. Without it the two lines have no common solution
   and pip resolves categories back under this composite's floor.
 

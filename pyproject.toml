@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.6.1"
+version = "0.6.2"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -163,10 +163,10 @@ dependencies = [
     # inert — shop still capped `stapel-listings<0.11`, so the listings line
     # below had no solution and pip resolved attributes back to 0.6.2 rather
     # than failing. The sixth instance of this exact shape in this block.
-    # >=0.2.13: the release that widens shop's own `stapel-categories<0.9`.
+    # >=0.2.14: the release that widens shop's own `stapel-categories<0.9`.
     # Without it the two lines have no common solution and pip resolves
     # categories back under this composite's floor.
-    "stapel-shop>=0.2.13,<0.3",
+    "stapel-shop>=0.2.14,<0.3",
     # >=0.8.1,<0.9, and the floor moves with the cap for the usual reason.
     # 0.8.0 stops keying a catalog re-import on the SLUG: an imported
     # category's slug comes from the source catalogue's node path, so a
@@ -193,7 +193,7 @@ dependencies = [
     # (they are not catalog rows, so nothing else reaches their labels), and
     # the ResolvedFeature gate covers the one config that carries FeatureDefs
     # inside it.
-    # >=0.9,<0.10 as of composite 0.6.1, and the floor moves with the cap by
+    # >=0.9,<0.10 as of composite 0.6.2, and the floor moves with the cap by
     # the rule this file applies everywhere else: a deployment able to resolve
     # back onto 0.8 gets stapel-search 0.7's type-ahead with no provider for
     # `categories.suggest` — the endpoint answers, warns `search.W008`, and
@@ -230,7 +230,7 @@ dependencies = [
     # stapel-attributes resolver this composite already registers — which is
     # what stops a panel reading «Состояние: Б/у» directly above
     # «Производитель: apple».
-    # >=0.7,<0.8 as of composite 0.6.1: 0.7.0 makes `/suggest` answer
+    # >=0.7,<0.8 as of composite 0.6.2: 0.7.0 makes `/suggest` answer
     # CATEGORIES — each row the full ancestor path plus the live listing
     # count, ranked by that count — which is what a classified's search box
     # is for, and it is paired with the stapel-categories floor above
