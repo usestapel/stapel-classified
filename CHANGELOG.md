@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.6.1 — 2026-08-31
+
+### The type-ahead offers PLACES — pins only, no code
+
+Patch: no model, migration, view, preset or code change. Three lines move so
+that a classified deployment can install the pair that makes a search box a
+navigation control.
+
+Typing «шорты» on a marketplace has three right answers and none of them is a
+string — the leaf sits under men's, under women's and under children's
+clothing, and what tells a buyer which one they meant is the ancestor path
+and the number of live listings behind it.
+
+- **`stapel-search>=0.6,<0.7` → `>=0.7,<0.8`.** 0.7.0 makes
+  `GET /search/api/v1/suggest` answer `categories[]`: the whole ancestor path,
+  a count that is the SERP's own count (asserted against `/query`, not
+  resembled), and a `category` string ready to paste into the SERP's filter.
+  One aggregate over the index does the counting, never one per row.
+- **`stapel-categories>=0.8.4,<0.9` → `>=0.9,<0.10`.** 0.9.0 provides
+  `categories.suggest`, the comm Function that half depends on. The floor
+  moves with the cap by the rule this file applies everywhere else: a
+  deployment able to resolve back onto 0.8 gets the endpoint, gets
+  `search.W008`, and gets no categories — a declaration that resolves to a
+  permanent degradation is a declaration that does nothing.
+- **`stapel-shop>=0.2.12` → `>=0.2.13`.** The release that widens shop's own
+  `stapel-categories<0.9`. Without it the two lines have no common solution
+  and pip resolves categories back under this composite's floor.
+
+Nothing in `preset.py` changes: `CATEGORY_SUGGEST_FUNCTION` defaults to
+`categories.suggest`, and in this composite's monolith both halves are in one
+process and the in-process comm registry resolves it.
+
 ## 0.6.0 — 2026-08-31
 
 ### The index holds the word a buyer types, not the slug a form stored
