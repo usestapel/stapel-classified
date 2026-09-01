@@ -1,5 +1,68 @@
 # Changelog
 
+## 0.8.0 — 2026-09-02
+
+Minor (pre-1.0: minor = breaking). Four member bumps that only mean anything
+together, and the one test in the fleet that can observe them doing so.
+
+### The seam, and why it is tested here
+
+A VIN and an IMEI identify a *specific physical unit* rather than describing
+it. Publishing one lets a stranger act as that unit's owner; indexing one
+turns search into an oracle that confirms which advert it belongs to. Making
+that impossible took four modules:
+
+- **stapel-attributes 0.8** added `FeatureDef.visibility` and stamps it onto
+  every stored value, so a read path with no schema in hand can still tell.
+- **stapel-categories 0.11** gave the catalogue the column to set it in, and
+  made `categories.features` carry it across the comm boundary.
+- **stapel-listings 0.12** stopped putting the value in the three public
+  projections at all, and redacts `features` per viewer on the way out.
+- **stapel-search 0.9** stopped indexing, planning, counting and filtering it.
+
+Each of those repos tests its own half against a stub of the others, and
+**every one of those suites can be green while the fleet still leaks** — the
+property that has to hold is a property of the seam, and no single repo can
+observe the chain. `tests/test_feature_visibility.py` is the only place it
+exists: a real `Feature` row carries the visibility, `categories.features`
+hands it over comm, `publish_listing` stamps it into the stored DAO, the HTTP
+detail read redacts it, the bus fact travels, stapel-search pulls the document
+back and the assertions are made against the public query surface. Nothing is
+stubbed. Every leak assertion has a paired control on a public sibling, so a
+build that simply stopped projecting attributes cannot pass.
+
+It also pins the honest half: the redacted stub says the value is `present`,
+and carries no `verification`, because nothing in this fleet runs a VIN check.
+
+### Fixed
+
+- **The test harness cached one category's schema for another's.**
+  `stapel_listings.services.category_schema` memoizes a category's features
+  under its ID; the database is rolled back between tests but LocMem is not,
+  and category primary keys are reused after a rollback. One test's schema
+  therefore answered the next test's lookup, and the symptom —
+  `Feature '<slug>' is not allowed` at publish — appeared only in a full run,
+  only in some orders, and never on a re-run of the failing test alone. The
+  autouse `_reset_registries` fixture now clears the Django cache.
+
+### Changed
+
+- `stapel-attributes>=0.7,<0.8` -> `>=0.8.1,<0.9`
+- `stapel-categories>=0.10,<0.11` -> `>=0.11,<0.12`
+- `stapel-listings>=0.11,<0.12` -> `>=0.12.1,<0.13`
+- `stapel-search>=0.8.1,<0.9` -> `>=0.9,<0.10`
+
+Every floor moves with its cap, for the reason this file has now given
+several times: a fleet able to resolve back onto the older half publishes the
+VIN again, and nothing errors while it does.
+
+### Upgrading
+
+Deploying is not enough. Values stored before the axis keep the VIN in their
+public projections until `python manage.py listings_reproject_features` has
+re-stamped them, and the search index keeps the old terms until
+`python manage.py search_rebuild --type listing` has run — in that order.
+
 ## 0.7.2 — 2026-09-02
 
 Patch. Two dependency ranges — no code, no model, no migration, no payload.

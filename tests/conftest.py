@@ -13,11 +13,28 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _reset_registries():
-    """Clear per-process caches the modules keep across tests."""
+    """Clear per-process caches the modules keep across tests.
+
+    The Django cache is one of them, and it matters more than it looks.
+    ``stapel_listings.services.category_schema`` memoizes a category's
+    features under its ID; the database is rolled back between tests but
+    LocMem is not, and category primary keys are REUSED after a rollback. So
+    one test's schema answers the next test's lookup for a numerically equal
+    but entirely unrelated category, and the symptom is
+    ``Feature '<slug>' is not allowed`` at publish — a failure that appears
+    only in a full run, only in some orders, and never when you re-run the one
+    test to investigate it. In production the same key is advanced by a
+    ``category.changed`` fact; here nothing advances it, because nothing
+    changed as far as the cache can tell.
+    """
+    from django.core.cache import cache
+
     from stapel_search import facets
 
     facets.reset_path_degradation()
+    cache.clear()
     yield
+    cache.clear()
 
 
 @pytest.fixture

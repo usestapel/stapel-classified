@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.7.2"
+version = "0.8.0"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -136,7 +136,16 @@ dependencies = [
     # exactly the screen this release was cut for: «Состояние: b-u», «Датчики:
     # gps», «Состояние экрана: bez-defektov» on live cards, and an index whose
     # only match for the word a buyer types was the description text.
-    "stapel-attributes>=0.7,<0.8",
+    # >=0.8,<0.9 as of 0.8.0, and the floor moves with the cap for the reason
+    # this block has now given five times. 0.8.0 adds `FeatureDef.visibility`
+    # — the axis that says an attribute IDENTIFIES a specific physical unit
+    # (a VIN, an IMEI, a serial number) rather than describing it, and must
+    # therefore never reach an anonymous reader. Under the old range this
+    # composite resolves onto a version with no axis at all: the catalogue has
+    # no way to mark the field, every consumer publishes it, and the fix is
+    # invisible because nothing errors. The three members below all require
+    # 0.8 themselves.
+    "stapel-attributes>=0.8.1,<0.9",
     # >=0.4, not >=0.2: 0.4.0 is where ALLOW_ANONYMOUS_WRITES exists at all.
     # A fleet that declares it under the old range gets an inert setting, so
     # the floor moves with the cap rather than leaving a deployment able to
@@ -207,7 +216,12 @@ dependencies = [
     # no-change: a deployment that resolves back onto categories 0.9 gets a
     # ranker whose only evidence, on a board where nearly every leaf is still
     # empty, has been flattened to two values.
-    "stapel-categories>=0.10,<0.11",
+    # >=0.11,<0.12 as of 0.8.0: 0.11.0 is where `Feature.visibility` exists as
+    # a column at all, and where `categories.features` REQUIRES it of every
+    # resolved feature. Under the old range the catalogue has no field in
+    # which to say that a VIN is not public, so the axis the other three
+    # members enforce is one nobody can ever set.
+    "stapel-categories>=0.11,<0.12",
     "stapel-vocabularies>=0.1,<0.2",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
@@ -224,7 +238,14 @@ dependencies = [
     # projections from the stored draft and the CURRENT category schema. A
     # write-time snapshot has no other way to become true again, and every
     # listing published before attributes 0.7.0 is a stale one.
-    "stapel-listings>=0.11,<0.12",
+    # >=0.12.1,<0.13 as of 0.8.0: 0.12.0 is the release that stops handing an
+    # identifier attribute's value to a reader without the entitlement — the
+    # build-time drop from the three public projections and the read-time
+    # redaction of `features`. 0.12.1 rather than 0.12.0 because that is where
+    # the pin on stapel-attributes states the version it actually needs.
+    # A fleet able to resolve back onto 0.11 publishes the VIN again, and
+    # nothing errors while it does.
+    "stapel-listings>=0.12.1,<0.13",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for
@@ -255,7 +276,12 @@ dependencies = [
     #     budget slots and the whole vocabulary identity chain fell past the
     #     cap. A bounded option set now outranks a measurement, always.
     # 0.8.1, not 0.8.0: 0.8.0 shipped with `__version__` still reading 0.7.0.
-    "stapel-search>=0.8.1,<0.9",
+    # >=0.9,<0.10 as of 0.8.0: 0.9.0 is where a non-public attribute stops
+    # being indexed, planned, counted or filterable. It matters independently
+    # of stapel-listings 0.12: an index is an ORACLE, so `?f.vin=<value>`
+    # confirming which listing a VIN belongs to is a disclosure even on a
+    # deployment whose detail pages are already clean.
+    "stapel-search>=0.9,<0.10",
     # >=0.4, not >=0.3: 0.4.0 is where stapel_moderation subscribes
     # 'user.merged' — a merge re-parents the reports and decisions an account
     # holds, and an app that only knows 'user.deleted' strands them. Under
