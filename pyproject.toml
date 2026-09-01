@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.7.0"
+version = "0.7.1"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -120,8 +120,9 @@ dependencies = [
     # <0.7 with the floor at 0.6: stapel-attributes 0.6.0 adds the composite
     # `group` kind — one feature holding a list of ROWS of child feature
     # definitions. It is not a nicety for an imported marketplace catalogue:
-    # 2 468 fields of the Avito autoload corpus ARE composites (a wholesale
-    # discount ladder, a compatible-cars table), and until 0.6 the importer
+    # 2 468 fields of the imported catalogue corpus ARE composites (a
+    # wholesale discount ladder, a compatible-vehicles table), and until 0.6
+    # the importer
     # counted them and dropped them. The floor moves with the cap for the
     # usual reason — a fleet able to resolve back onto 0.5 is a fleet whose
     # catalogue silently loses those fields again — and because the two

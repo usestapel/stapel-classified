@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.1 — 2026-09-01
+
+Patch. Comments and changelog prose only — no code, dependency range, model or
+API change.
+
+The dependency comment explaining why the `stapel-attributes` cap had to move,
+and the two changelog passages recounting the same import, named the external
+marketplace whose catalogue was imported. They now say what the argument
+actually rests on: an imported external catalogue, 2 468 of whose fields are
+composites.
+
 ## 0.7.0 — 2026-08-31
 
 ### A card carries the GALLERY — a SERP row can finally be swiped
@@ -190,8 +201,9 @@ own surface does not.
 
 0.5.2 pinned the members whose own caps matched this one — every line said
 `stapel-attributes<0.6`, and that was coherent. It was also the wall: **2 468
-fields of the Avito autoload corpus are composites** (a wholesale discount
-ladder — "from N units, M % off", up to five steps; a compatible-cars table),
+fields of the imported catalogue corpus are composites** (a wholesale
+discount ladder — "from N units, M % off", up to five steps; a
+compatible-vehicles table),
 and until stapel-attributes 0.6.0 no kind could hold a list of rows, so the
 importer counted them and dropped them. A composite whose whole subject is an
 imported marketplace catalogue cannot cap a fleet under the release that stops
@@ -257,7 +269,7 @@ only as a fallback for rows with no source id.
 **0.8.1** is what makes a full-catalog import finish at all. django-treenode
 rebuilt its denormalized tree columns from a `post_save` receiver — one read of
 the table plus one `UPDATE` per row — for every row written, and `load_catalog`
-writes every record through `save()` by design. A 2901-leaf Avito import (3444
+writes every record through `save()` by design. A 2901-leaf catalogue import (3444
 categories, 14 409 feature rows, 52 488 links) never completed; it is 185 s
 now.
 
