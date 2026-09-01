@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.2 — 2026-09-02
+
+Patch. Two dependency ranges — no code, no model, no migration, no payload.
+
+- `stapel-categories>=0.9,<0.10` -> `>=0.10,<0.11`
+- `stapel-search>=0.7,<0.8` -> `>=0.8.1,<0.9`
+
+The two move TOGETHER because either half alone is a no-change, the same
+pairing 0.6.2 recorded for the type-ahead itself. categories 0.10.0 grades a
+`categories.suggest` hit four ways — `exact` / `prefix` / `word` /
+`substring` — where it graded it two; search 0.8 is the module that RANKS on
+that grade, and on a board where nearly every leaf is still empty the grade
+is the only evidence a ranker has. A deployment resolving back onto
+categories 0.9 gets the new ranker with its evidence flattened.
+
+search 0.8 also fixes the facet plan, which is what a SERP on this
+composite's own catalogue is made of: it ranked on the author's flags alone,
+so on a 59-feature imported leaf a mandatory integer took the last of twelve
+budget slots and the whole vocabulary identity chain fell past the cap — a
+car buyer offered the body number and nine dealer promotions to filter by,
+and not the make. A feature with a bounded option set now outranks one
+without.
+
+The floor is 0.8.1 rather than 0.8.0: 0.8.0 shipped with `__version__` still
+reading `0.7.0`.
+
 ## 0.7.1 — 2026-09-01
 
 Patch. Comments and changelog prose only — no code, dependency range, model or

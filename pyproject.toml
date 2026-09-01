@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.7.1"
+version = "0.7.2"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -200,7 +200,14 @@ dependencies = [
     # `categories.suggest` — the endpoint answers, warns `search.W008`, and
     # offers no categories at all. A declaration that resolves to a permanent
     # degradation is a declaration that does nothing.
-    "stapel-categories>=0.9,<0.10",
+    # >=0.10,<0.11 as of composite 0.7.2, paired with the stapel-search line
+    # below by the same rule: 0.10.0 grades a `categories.suggest` hit four
+    # ways (exact / prefix / word / substring) instead of two, and search 0.8
+    # is the module that RANKS on that grade. Either half alone is a
+    # no-change: a deployment that resolves back onto categories 0.9 gets a
+    # ranker whose only evidence, on a board where nearly every leaf is still
+    # empty, has been flattened to two values.
+    "stapel-categories>=0.10,<0.11",
     "stapel-vocabularies>=0.1,<0.2",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
@@ -236,7 +243,19 @@ dependencies = [
     # count, ranked by that count — which is what a classified's search box
     # is for, and it is paired with the stapel-categories floor above
     # because one without the other is half a feature.
-    "stapel-search>=0.7,<0.8",
+    # >=0.8.1,<0.9 as of composite 0.7.2. Two rankings, both measured on a
+    # live board at full catalogue scale and both of them a case of the right
+    # answer being computed and then sorted below something worse:
+    #   * `/suggest` sorted an all-zero result set by NAME, so the node a
+    #     buyer typed letter for letter came third behind two nodes that
+    #     merely contain the word. It now sorts stocked-before-empty, then by
+    #     the match grade categories 0.10 reports — the floor above.
+    #   * the facet plan ranked on the author's flags alone, so on a
+    #     59-feature imported leaf a mandatory integer took the last of twelve
+    #     budget slots and the whole vocabulary identity chain fell past the
+    #     cap. A bounded option set now outranks a measurement, always.
+    # 0.8.1, not 0.8.0: 0.8.0 shipped with `__version__` still reading 0.7.0.
+    "stapel-search>=0.8.1,<0.9",
     # >=0.4, not >=0.3: 0.4.0 is where stapel_moderation subscribes
     # 'user.merged' — a merge re-parents the reports and decisions an account
     # holds, and an app that only knows 'user.deleted' strands them. Under
