@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.4] — 2026-09-02
+
+Dependency-range patch, no code. `stapel-categories<0.13` -> `<0.14` and the
+stapel-shop floor to 0.2.19 (the release whose own cap admits categories
+0.13). Categories 0.13.0 is the release that takes source-catalogue
+provenance (`external_id`/`external_source`) off the public read surface —
+the two caps in front of it turned that security bump into
+ResolutionImpossible for the fleet that needed it. Suite passes against
+0.13.0 unmodified: the composite consumes the tree, the feature schema and
+the comm surface, none of which moved.
+
 ## [0.8.3] — 2026-09-02
 
 ### Added — the vector net wired end to end, behind one deployment flag
