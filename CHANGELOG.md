@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.8.7] — 2026-09-03
+
+Dependency-range patch, no code. `stapel-categories<0.15` -> `<0.16`, and
+the stapel-shop floor to 0.2.22 (the release whose own cap admits it).
+
+**stapel-categories 0.15.0** makes `active` stand-owned curation. A
+catalogue re-import writes it only on create, so it can no longer resurrect
+a category an operator retired in the admin — the failure the presentation
+keys were pulled out for in 0.13.0, one field over, and one this composite's
+own fleet hit: an import of records that had changed for reasons of their
+own brought two untyped dead-end leaves and a duplicate sibling back in
+front of sellers. It also adds the resurrection half of the `catalog_health`
+gate, which is the check that survives a bypassed guard.
+
+Breaking for a `.sync-state.json` sidecar (`STATE_VERSION` 3 -> 4: re-run
+`export_catalog`, or load once without one) and for anyone who expected a
+fixture's `active` to win on update. The composite calls neither surface;
+the service that imports a 2 901-leaf catalogue into a curated stand is the
+reason both exist.
+
 ## [0.8.6] — 2026-09-02
 
 Dependency-range patch, no code. `stapel-listings<0.15` -> `<0.16`, and the

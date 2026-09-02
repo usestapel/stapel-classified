@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.8.6"
+version = "0.8.7"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -185,7 +185,7 @@ dependencies = [
     # listings 0.14 — the floor moves with the caps above for the recorded
     # reason: without it pip resolves a shop that caps the members back down
     # and the widening above does nothing, silently.
-    "stapel-shop>=0.2.21,<0.3",
+    "stapel-shop>=0.2.22,<0.3",
     # >=0.8.1,<0.9, and the floor moves with the cap for the usual reason.
     # 0.8.0 stops keying a catalog re-import on the SLUG: an imported
     # category's slug comes from the source catalogue's node path, so a
@@ -246,7 +246,15 @@ dependencies = [
     # way a person sees the cascade, so a guess is a valid path by
     # construction. The composite itself calls nothing of it; the cap was the
     # only wall in front of the service that does.
-    "stapel-categories>=0.11,<0.15",
+    # <0.16, not <0.15: stapel-categories 0.15.0 makes `active` stand-owned
+    # curation — a catalogue re-import writes it only on create, so it can no
+    # longer resurrect a category an operator retired — and adds the
+    # resurrection half of `catalog_health` (an active category under an
+    # inactive parent: reachable by search or a saved link while the path to
+    # it is closed). The composite calls neither; the fleet that imports a
+    # 2 901-leaf catalogue into a curated stand is the whole reason both
+    # exist, and the cap was the only wall in front of it.
+    "stapel-categories>=0.11,<0.16",
     # >=0.1.3 as of composite 0.8.2: the release where the QUERY_EXPANDER
     # seam exists. The preset now STATES that key, and an AppSettings that
     # has never heard of it must not be handed it — the floor names the
