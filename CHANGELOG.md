@@ -23,6 +23,13 @@ the sweep that drops index rows whose source no longer serves them: the
 answer for the writes that predate the detector above, and for the queryset
 `.update()` that will always bypass a model layer.
 
+Also: the composite's own boot gate (`test_system_checks_report_no_errors`)
+was red on main. The harness declares an **external** `auth/` mount — the
+deployment's own statement that a sibling service serves that prefix — and
+so owed the navigation registry the same list (`stapel_core.nav.E004`). It
+is seeded in the harness now rather than excused in the test: a check that
+fires on a realistic host is the check working.
+
 ## [0.8.5] — 2026-09-02
 
 Dependency-range patch, no code. `stapel-categories<0.14` -> `<0.15`,

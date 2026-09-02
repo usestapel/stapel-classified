@@ -187,6 +187,17 @@ def pytest_configure(config):
             STAPEL_CHAT=preset.SETTINGS_DEFAULTS["STAPEL_CHAT"],
             STAPEL_REVIEWS=preset.SETTINGS_DEFAULTS["STAPEL_REVIEWS"],
             STAPEL_LISTINGS={"REQUIRE_IMAGE_ON_PUBLISH": False},
+            # This harness declares an EXTERNAL `auth/` mount, which is the
+            # deployment saying "a sibling service serves that prefix" — so
+            # it is a split deployment and owes the navigation registry the
+            # same list (stapel_core.nav.E004). Seeded here rather than
+            # silenced in the check test: the composite's own boot gate
+            # asserts zero ERRORs, and a harness that trips a real check is
+            # the check working, not the test being wrong.
+            STAPEL_SERVICES=[
+                {"name": "classified", "prefix": ""},
+                {"name": "auth", "prefix": "auth/"},
+            ],
         )
         import django
 
