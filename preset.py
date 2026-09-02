@@ -112,16 +112,31 @@ SETTINGS_DEFAULTS = {
     # installed, listings must not approve its own submissions, or the
     # pre-publication queue would exist and never hold anything.
     #
-    # NOTE there is no STAPEL_VOCABULARIES entry either, and its CONFIG.MD is
-    # the reason: every key in that namespace is optional, and the one axis —
-    # REGISTER_RESOLVER — already defaults to True, which is exactly what a
-    # deployment that MOUNTS the vocabularies wants. Restating it would add a
-    # second place to drift from, and turning it off here would produce the
+    # STAPEL_VOCABULARIES states ONE key, and it is a wiring, not a drift
+    # risk: QUERY_EXPANDER is the seam vocabularies 0.1.3 opened so its term
+    # search can consume the fleet's cross-script normalization layer
+    # WITHOUT depending on the library that owns it. Standalone, the seam
+    # defaults to literal matching; in THIS composite both libraries are
+    # installed by construction, and a buyer who types «тимберленд» into a
+    # brand picker means the term labeled "Timberland" — the exact knowledge
+    # stapel-search's dictionaries already hold for the type-ahead. Wiring
+    # it here is the "one layer, consumed, never copied" rule; leaving it
+    # unwired would be the two-copies drift in its lazier form: one box on
+    # the page understanding Cyrillic brand queries while the picker beside
+    # it does not.
+    #
+    # Every OTHER key in that namespace stays unstated, and its CONFIG.MD is
+    # the reason: they are optional, and the one axis — REGISTER_RESOLVER —
+    # already defaults to True, which is exactly what a deployment that
+    # MOUNTS the vocabularies wants. Turning it off here would produce the
     # deployment stapel_vocabularies.W002 exists to report: the process
     # holding the terms refusing to answer about them, so every ref_select
     # feature fails to save while GET /vocabularies/api/v1/... lists the same
     # terms. It is held as a GATE instead (tests/test_vocabularies.py), the
     # same way AUTO_APPROVE_ON_PUBLISH is.
+    "STAPEL_VOCABULARIES": {
+        "QUERY_EXPANDER": "stapel_search.suggest.query_terms",
+    },
     #
     # RECOMMENDED_ACCESS_ROLES gains nothing either: the read surface is
     # `ReadOnlyOrStaff`, i.e. anonymous GETs and no writer at all (loading a
@@ -192,6 +207,14 @@ SETTINGS_DEFAULTS = {
                 # Pre-publication: a submitted listing waits for a verdict.
                 # listing.submitted is emitted on entry to `pending`, and the
                 # verdict is what moves it to published or blocked.
+                #
+                # The other half of this policy is STAPEL_LISTINGS
+                # ["MODERATION_GATE"] (listings 0.13.3), which decides what
+                # publish actually DOES; the two must agree, and
+                # checks.check_moderation_gate_agreement (classified.E004)
+                # fails the boot when they do not. A stand that wants
+                # post-moderation — publish first, review after, a rejecting
+                # verdict takes it down — flips BOTH to "post".
                 "gate": "pre",
                 "intake_events": ["listing.submitted"],
                 # The *.moderation_content family takes the owner's own id

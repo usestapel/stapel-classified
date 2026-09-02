@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.8.1"
+version = "0.8.2"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -237,7 +237,11 @@ dependencies = [
     # measured on a live stand as a 15-page, 614 KB walk behind a cold
     # catalogue page. The floor stays at 0.11 (`Feature.visibility`).
     "stapel-categories>=0.11,<0.13",
-    "stapel-vocabularies>=0.1,<0.2",
+    # >=0.1.3 as of composite 0.8.2: the release where the QUERY_EXPANDER
+    # seam exists. The preset now STATES that key, and an AppSettings that
+    # has never heard of it must not be handed it — the floor names the
+    # version the stated key is real in.
+    "stapel-vocabularies>=0.1.3,<0.2",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
     # a deployment able to resolve back onto a listings without the behaviour
@@ -268,9 +272,16 @@ dependencies = [
     # whatever an older engine left there; measured on a live stand as 12
     # listings stuck on a stale shape for reasons unrelated to the fields
     # broken on screen. Capping a fleet under it keeps the repair this
-    # composite depends on half-working. The floor stays at 0.12.1 (the
-    # identifier attribute never leaving the module).
-    "stapel-listings>=0.12.1,<0.14",
+    # composite depends on half-working.
+    #
+    # >=0.13.3 as of composite 0.8.2: the release where MODERATION_GATE
+    # exists. checks.check_moderation_gate_agreement (classified.E004) holds
+    # that key and STAPEL_MODERATION's per-target gate together; against an
+    # older listings the knob is a declared-but-unconsumed key the check has
+    # to special-case as "pre". The floor states the version the seam is
+    # actually checked against, so the special case is for a stale
+    # environment, not a resolvable install.
+    "stapel-listings>=0.13.3,<0.14",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for

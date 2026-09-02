@@ -89,4 +89,82 @@ def check_card_providers(app_configs, **kwargs):
     )]
 
 
-__all__ = ["MOVED_KEYS", "check_block_keys_moved", "check_card_providers"]
+@checks.register(checks.Tags.compatibility)
+def check_moderation_gate_agreement(app_configs, **kwargs):
+    """E004 — the two halves of the moderation-gate policy must agree.
+
+    The policy is spelled twice because each module owns its own half:
+    stapel-moderation's per-target ``gate`` says what the QUEUE believes
+    ("pre": nothing is public before my verdict), stapel-listings'
+    ``MODERATION_GATE`` says what publish actually DOES. Two settings that
+    can disagree is how one half publishes immediately while the other half
+    still gates: listings post / moderation pre puts live content in front
+    of a queue that believes it is screening drafts; listings pre /
+    moderation post holds every first publication in ``pending`` for a
+    verdict the policy says nothing should wait for — on a moderator-less
+    stand, forever. An ERROR because both directions are silent at runtime:
+    every component is green in isolation, and only the seam is wrong.
+
+    This check is also what makes moderation's ``gate`` key non-inert for
+    the listing target: until it, nothing consumed the declaration at all.
+    """
+    from stapel_listings.conf import listings_settings
+    from stapel_moderation.registry import UnknownTargetType, resolve_policy
+
+    target_type = listings_settings.MODERATION_TARGET_TYPE
+    try:
+        moderation_gate = resolve_policy(target_type)["gate"]
+    except UnknownTargetType:
+        # No policy registered for the listing target at all — that is the
+        # three-name alignment defect, owned elsewhere (a consumer whose
+        # name is absent from the registry never gets a verdict); a gate
+        # comparison against a missing policy would only shout twice.
+        return []
+
+    # An installed stapel-listings older than 0.13.3 has no MODERATION_GATE
+    # default and consumes no such key: whatever the host declares, that lib
+    # gates "pre". Reading the declared value through AppSettings would
+    # report the value nothing is reading, so the DEFAULTS table — what the
+    # installed code actually consults — is the authority on whether the
+    # knob exists.
+    if "MODERATION_GATE" in listings_settings.defaults:
+        listings_gate = listings_settings.MODERATION_GATE
+    else:
+        listings_gate = "pre"
+
+    # A value outside {pre, post} is its owner's enum check
+    # (stapel_listings.E001 / stapel_moderation.E003); comparing garbage
+    # here would report the same mistake twice under a misleading name.
+    valid = ("pre", "post")
+    if moderation_gate not in valid or listings_gate not in valid:
+        return []
+    if moderation_gate == listings_gate:
+        return []
+    if listings_gate == "post":
+        doing = "publishes first publications immediately"
+    else:
+        doing = "holds every first publication in pending for a verdict"
+    return [
+        checks.Error(
+            f"Moderation-gate policy disagrees with itself: "
+            f"STAPEL_MODERATION's policy for target type {target_type!r} "
+            f"declares gate={moderation_gate!r} while "
+            f"STAPEL_LISTINGS['MODERATION_GATE'] is {listings_gate!r}. "
+            f"Listings {doing} while the queue believes the "
+            f"{moderation_gate!r} model — a seam defect that is invisible "
+            f"in either module alone.",
+            hint="Set both to the same value: 'pre' (nothing public before "
+                 "the verdict) or 'post' (publish first, review after; a "
+                 "rejecting verdict takes the listing down). The preset "
+                 "ships pre/pre.",
+            id="stapel_classified.E004",
+        )
+    ]
+
+
+__all__ = [
+    "MOVED_KEYS",
+    "check_block_keys_moved",
+    "check_card_providers",
+    "check_moderation_gate_agreement",
+]

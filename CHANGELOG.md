@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.8.2] — 2026-09-02
+
+Patch. `stapel_classified.E004` — the moderation-gate agreement check — and
+with it, stapel-moderation's `gate` key stops being inert for listings.
+
+The policy "when does a listing go public relative to its review" is spelled
+twice, on purpose, because each module owns its own half: the preset's
+`STAPEL_MODERATION["TARGET_TYPES"]["listing"]["gate"]` says what the queue
+believes, and stapel-listings 0.13.3's `MODERATION_GATE` says what publish
+actually does. Two settings that can disagree is how one half publishes
+immediately while the other half still gates — listings `post` / moderation
+`pre` puts live content in front of a queue that thinks it screens drafts;
+listings `pre` / moderation `post` holds every first publication in
+`pending` for a verdict the policy says nothing should wait for, which on a
+moderator-less stand is forever. Both directions are silent at runtime and
+green in every module's own suite; only the composite can see the seam, so
+the composite now fails the boot on it.
+
+Graceful against a stale environment: an installed stapel-listings without
+the knob (older than 0.13.3) consumes no `MODERATION_GATE` whatever the host
+declares, and the check reads it as the `pre` it actually is instead of the
+declared value nothing is reading. The floor moves to `stapel-listings
+>=0.13.3` regardless, so a resolvable install always has the real seam.
+
+The preset keeps `gate: "pre"` for listings — flipping a stand to
+post-moderation is two settings, changed together, and E004 is what makes
+"together" enforceable.
+
+Also in this patch: the preset states `STAPEL_VOCABULARIES
+["QUERY_EXPANDER"] = "stapel_search.suggest.query_terms"` — vocabularies
+0.1.3's seam, pointed at the fleet's one cross-script normalization layer,
+so the composer's brand pickers understand «тимберленд» the way the
+type-ahead already does. One layer, consumed, never copied; the composite
+test imports the dotted path and runs a real cross-script query through
+it, so a rename in either library fails in CI and not in a buyer's
+picker. Floors: `stapel-vocabularies>=0.1.3` (the release where the
+stated key is real).
+
 ## [0.8.1] — 2026-09-02
 
 Patch. Caps and one floor — no code, no model, no migration, no payload.

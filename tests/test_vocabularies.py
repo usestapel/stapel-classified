@@ -29,6 +29,24 @@ def test_vocabularies_is_a_member():
     assert mounted["stapel_vocabularies.urls"] == "vocabularies/"
 
 
+def test_the_preset_wires_the_query_expander_to_the_search_layer():
+    """One normalization layer, consumed, never copied (vocabularies 0.1.3).
+
+    Standalone, the term search matches literally; in THIS composite both
+    libraries are installed by construction, so the preset points the
+    QUERY_EXPANDER seam at stapel-search\'s variant expansion — the same
+    dictionaries the type-ahead uses. The dotted path is asserted to
+    IMPORT and to answer the seam\'s contract on a real cross-script query,
+    so a rename in either library fails here and not in a buyer\'s picker.
+    """
+    from django.utils.module_loading import import_string
+
+    dotted = preset.SETTINGS_DEFAULTS["STAPEL_VOCABULARIES"]["QUERY_EXPANDER"]
+    expander = import_string(dotted)
+    variants = expander("айфон", "ru")
+    assert "iphone" in variants
+
+
 def test_vocabularies_loads_before_anything_that_validates_a_ref_config():
     """The order constraint, asserted rather than left in a comment.
 

@@ -166,6 +166,81 @@ def test_listings_does_not_auto_approve_its_own_submissions():
     assert listings_settings.AUTO_APPROVE_ON_PUBLISH is False
 
 
+def _flip_moderation_gate(settings, gate):
+    """Declare *gate* for the listing target in STAPEL_MODERATION.
+
+    A fresh deep-ish copy: mutating the preset's nested dict in place would
+    leak the flip into every later test through SETTINGS_DEFAULTS.
+    """
+    mod = dict(settings.STAPEL_MODERATION)
+    mod["TARGET_TYPES"] = {
+        name: dict(policy) if policy else policy
+        for name, policy in mod["TARGET_TYPES"].items()
+    }
+    mod["TARGET_TYPES"]["listing"]["gate"] = gate
+    settings.STAPEL_MODERATION = mod
+
+
+def test_moderation_gate_agreement_holds_on_the_preset_defaults():
+    """The preset's pre/pre position — E004 has nothing to say."""
+    from stapel_classified.checks import check_moderation_gate_agreement
+
+    assert check_moderation_gate_agreement(None) == []
+
+
+def test_moderation_gate_agreement_holds_on_post_post(settings):
+    from stapel_classified.checks import check_moderation_gate_agreement
+
+    _flip_moderation_gate(settings, "post")
+    settings.STAPEL_LISTINGS = {"MODERATION_GATE": "post"}
+    assert check_moderation_gate_agreement(None) == []
+
+
+def test_moderation_gate_disagreement_is_an_error(settings):
+    """E004 — one half publishes immediately, the other still gates.
+
+    Both directions are the same defect: listings post / moderation pre
+    means the queue believes nothing is public before its verdict while the
+    content is already live; listings pre / moderation post means listings
+    holds everything in pending while the policy says nothing should wait.
+    """
+    from stapel_classified.checks import check_moderation_gate_agreement
+
+    settings.STAPEL_LISTINGS = {"MODERATION_GATE": "post"}
+    findings = check_moderation_gate_agreement(None)
+    assert [f.id for f in findings] == ["stapel_classified.E004"]
+
+    _flip_moderation_gate(settings, "post")
+    settings.STAPEL_LISTINGS = {"MODERATION_GATE": "pre"}
+    findings = check_moderation_gate_agreement(None)
+    assert [f.id for f in findings] == ["stapel_classified.E004"]
+
+
+def test_moderation_gate_check_tolerates_a_listings_without_the_knob(
+    settings, monkeypatch
+):
+    """An installed stapel-listings older than 0.13.3 gates pre, whatever
+    the host declares — a declared-but-unconsumed key must read as "pre",
+    not as the value nothing is reading."""
+    from stapel_listings.conf import listings_settings
+
+    from stapel_classified.checks import check_moderation_gate_agreement
+
+    monkeypatch.delitem(listings_settings.defaults, "MODERATION_GATE")
+    listings_settings.reload()
+    try:
+        # The host declares "post" into a lib that cannot consume it: the
+        # effective listings gate is still "pre", agreeing with the preset.
+        settings.STAPEL_LISTINGS = {"MODERATION_GATE": "post"}
+        assert check_moderation_gate_agreement(None) == []
+        # And the genuine disagreement is still caught on the moderation side.
+        _flip_moderation_gate(settings, "post")
+        findings = check_moderation_gate_agreement(None)
+        assert [f.id for f in findings] == ["stapel_classified.E004"]
+    finally:
+        listings_settings.reload()
+
+
 def test_recommended_access_roles_are_a_recommendation_only():
     """The role table is named, and deliberately not applied.
 
