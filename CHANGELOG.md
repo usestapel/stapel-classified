@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.8.6] — 2026-09-02
+
+Dependency-range patch, no code. `stapel-listings<0.15` -> `<0.16`, and the
+floors to stapel-shop 0.2.21 / stapel-search 0.10.5 — the releases whose own
+caps admit it and whose sweep answers the other half.
+
+**stapel-listings 0.15.0** moves the index-boundary detector into
+`Listing.save()`: a status write that skipped the state machine — an
+orchestrator's raw write, a management command — used to move a listing out
+of every public read while the search index kept serving it, and the click
+answered "no longer published". That seam is the one THIS composite owns; it
+is the module that registers listings as a stapel-search source. It also
+makes `price` nullable, so an unstated price is NULL rather than a public
+"0 ₽". The card needed no change for it — `dto.ListingCard.price` is already
+`Optional` and `cards._base_card` passes the value through untouched — which
+is why the null now reaches a storefront as a null and "price not stated" is
+renderable without a client guessing what a zero meant.
+
+**stapel-search 0.10.5** adds `reconcile` / `manage.py search_reconcile`,
+the sweep that drops index rows whose source no longer serves them: the
+answer for the writes that predate the detector above, and for the queryset
+`.update()` that will always bypass a model layer.
+
 ## [0.8.5] — 2026-09-02
 
 Dependency-range patch, no code. `stapel-categories<0.14` -> `<0.15`,
