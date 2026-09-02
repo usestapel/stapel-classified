@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.1] — 2026-09-03
+
+### Changed
+
+- `stapel-vocabularies` cap `<0.2` -> `<0.3` and `stapel-moderation` `<0.5` ->
+  `<0.6`. Ranges only. 0.2.0 gives a dictionary term an ordering signal and a
+  scored `vocabularies.match`; moderation 0.5.0 implements `MEDIA_TRANSPORT`
+  (declared and read by nothing before it, so every screening of a listing
+  with a real photo answered `screening_unavailable`) and adds the
+  synchronous draft gate. Held where they were, both caps pinned a fleet
+  installing this composite to the broken halves.
+
 ## [0.9.0] — 2026-09-03
 
 ### Changed

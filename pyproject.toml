@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.9.0"
+version = "0.9.1"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -266,7 +266,15 @@ dependencies = [
     # version the stated key is real in.
     # >=0.1.4: the vector.label_corpus provider this preset registers, and
     # the VECTOR_SIMILAR_FUNCTION consumer it points at search.similar.
-    "stapel-vocabularies>=0.1.4,<0.2",
+    # <0.3, not <0.2: 0.2.0 gives a term an ordering signal (`popularity`,
+    # a `popular` band, and a `vocabularies.match` that returns a real score
+    # instead of dropping it). Range only for THIS module — the preset still
+    # registers the same corpus provider and points the same consumer at
+    # `search.similar`. Held at <0.2 the cap pinned every fleet to a
+    # dictionary that can only be alphabetical and to a matcher no caller
+    # can threshold, which is the fifth time in this file a sibling's cap,
+    # not an incompatibility, was the wall.
+    "stapel-vocabularies>=0.1.4,<0.3",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
     # a deployment able to resolve back onto a listings without the behaviour
@@ -391,7 +399,15 @@ dependencies = [
     # the old range a resolver picks 0.3.x and this composite's own
     # `manage.py check` raises stapel_core.lifecycle.E001; the cap moves with
     # the floor by the house pre-1.0 rule.
-    "stapel-moderation>=0.4,<0.5",
+    # <0.6, not <0.5: 0.5.0 implements MEDIA_TRANSPORT — declared in its conf
+    # and read by nothing, so every screening of a listing with a REAL photo
+    # sent the provider a host-relative path and came back
+    # `screening_unavailable`. It also adds the synchronous draft gate
+    # (`moderation.screen_draft`) this composite's composer needs to refuse a
+    # non-compliant draft in the composer instead of publishing it and
+    # reviewing after. Both are additive; nothing this module calls changed
+    # shape.
+    "stapel-moderation>=0.4,<0.6",
     # >=0.6.1 is LOAD-BEARING, not hygiene: 0.6.1 is where chat began
     # refusing a blocked pair the THREAD at create_direct, and 0.4.0
     # deleted this package's own pre-creation door on that promise.
