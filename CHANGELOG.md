@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.8.3] — 2026-09-02
+
+### Added — the vector net wired end to end, behind one deployment flag
+
+stapel-search 0.10.0 ships the embedding-similarity net (pgvector store,
+`search.similar`, the `VECTOR_CORPORA` registry) and stapel-vocabularies
+0.1.4 ships both sides of its seam (`vector.label_corpus` provider,
+`VECTOR_SIMILAR_FUNCTION` consumer). This composite is the one that knows
+both members, so its preset now declares the plumbing:
+
+- `STAPEL_SEARCH["VECTOR_CORPORA"]` — `category` from the new
+  `stapel_classified.vector_corpora.category_corpus` (every VISIBLE
+  category name, ancestry as payload so a vector hit renders exactly like
+  a name-matched destination), `vocab_label` from
+  `stapel_vocabularies.vector.label_corpus`;
+- `STAPEL_VOCABULARIES["VECTOR_SIMILAR_FUNCTION"] = "search.similar"` and
+  the brand-shaped `VECTOR_LABEL_LEVELS` globs (an imported marketplace
+  catalogue spells "brand" five ways).
+
+None of it runs until a deployment sets the ONE flag —
+`STAPEL_SEARCH["VECTOR_SUGGEST"]` — and builds the index
+(`manage.py search_vector_index`, `--estimate` first: embedding is a
+bill). Floors: stapel-search `>=0.10.1,<0.11` (0.9.1 and 0.10.0 are both broken
+— the first released the suggest hook without the package, the second
+released a wheel that omitted the package from its explicit packages
+list; on either, every suggest request with a query 500s),
+stapel-vocabularies `>=0.1.4`.
+
 ## [0.8.2] — 2026-09-02
 
 Patch. `stapel_classified.E004` — the moderation-gate agreement check — and

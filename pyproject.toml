@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.8.2"
+version = "0.8.3"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -241,7 +241,9 @@ dependencies = [
     # seam exists. The preset now STATES that key, and an AppSettings that
     # has never heard of it must not be handed it — the floor names the
     # version the stated key is real in.
-    "stapel-vocabularies>=0.1.3,<0.2",
+    # >=0.1.4: the vector.label_corpus provider this preset registers, and
+    # the VECTOR_SIMILAR_FUNCTION consumer it points at search.similar.
+    "stapel-vocabularies>=0.1.4,<0.2",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
     # a deployment able to resolve back onto a listings without the behaviour
@@ -317,7 +319,15 @@ dependencies = [
     # of stapel-listings 0.12: an index is an ORACLE, so `?f.vin=<value>`
     # confirming which listing a VIN belongs to is a disclosure even on a
     # deployment whose detail pages are already clean.
-    "stapel-search>=0.9,<0.10",
+    # >=0.10.1,<0.11 as of composite 0.8.3: 0.10.x is the vector net (the
+    # VECTOR_CORPORA registry this preset now populates, and the
+    # `search.similar` Function the vocabularies typeahead is pointed at).
+    # The floor is the PATCH because both prior wheels are broken the same
+    # way — 0.9.1's release commit carried the suggest hook without the
+    # package, 0.10.0's wheel omitted the package from its explicit
+    # packages list — and on either, every suggest request with a query
+    # 500s.
+    "stapel-search>=0.10.1,<0.11",
     # >=0.4, not >=0.3: 0.4.0 is where stapel_moderation subscribes
     # 'user.merged' — a merge re-parents the reports and decisions an account
     # holds, and an app that only knows 'user.deleted' strands them. Under

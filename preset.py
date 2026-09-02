@@ -136,6 +136,27 @@ SETTINGS_DEFAULTS = {
     # same way AUTO_APPROVE_ON_PUBLISH is.
     "STAPEL_VOCABULARIES": {
         "QUERY_EXPANDER": "stapel_search.suggest.query_terms",
+        # The vector net's plumbing, wired so that ONE deployment flag —
+        # STAPEL_SEARCH["VECTOR_SUGGEST"] — turns the whole thing on. While
+        # that flag is off (the default), `search.similar` answers
+        # `degraded: ["vector_disabled"]` without embedding anything, and
+        # the typeahead's net costs one comm round trip into a no-op; the
+        # levels list feeds `label_corpus`, which only ever runs inside
+        # `manage.py search_vector_index`, so naming levels here spends
+        # nothing until an operator prices and builds the index
+        # (`--estimate` first — embedding is a bill).
+        "VECTOR_SIMILAR_FUNCTION": "search.similar",
+        # The brand-shaped levels of the imported catalogues — where the
+        # typo problem lives. Glob patterns over level names; an imported
+        # marketplace catalogue spells "brand" five ways.
+        "VECTOR_LABEL_LEVELS": [
+            "brand*",
+            "brend*",
+            "make*",
+            "marka*",
+            "vendor*",
+            "proizvoditel*",
+        ],
     },
     #
     # RECOMMENDED_ACCESS_ROLES gains nothing either: the read surface is
@@ -149,6 +170,16 @@ SETTINGS_DEFAULTS = {
         # called per entry, so the composite declares the one corpus it has.
         "SOURCES": {
             "listing": "stapel_classified.search_sources.listing_source",
+        },
+        # The vector net's corpora — the registry stapel-search ships empty
+        # for the same reason it ships SOURCES empty: it knows nothing
+        # about categories or vocabularies. This composite knows both.
+        # Declaring the providers costs nothing at runtime (they only run
+        # inside `manage.py search_vector_index`); the net itself stays
+        # behind STAPEL_SEARCH["VECTOR_SUGGEST"], default off.
+        "VECTOR_CORPORA": {
+            "category": "stapel_classified.vector_corpora.category_corpus",
+            "vocab_label": "stapel_vocabularies.vector.label_corpus",
         },
     },
     "STAPEL_MODERATION": {
