@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.5] — 2026-09-02
+
+Dependency-range patch, no code. `stapel-categories<0.14` -> `<0.15`,
+`stapel-listings<0.14` -> `<0.15`, and the stapel-shop floor to 0.2.20 (the
+release whose own caps admit both). Categories 0.14.0 adds the
+`categories.children` comm Function — the rung-by-rung tree read the
+fleet's listing-draft recognizer walks a category guess with, one rung's
+siblings at a time, the way a person walks the cascade. Listings 0.14.0
+claims CDN media references for a listing's photos, the half without which
+stapel-cdn's orphan sweeper cannot tell a live photo from an abandoned
+upload. The composite reads neither surface itself; both caps were the
+only wall in front of the services that do.
+
 ## [0.8.4] — 2026-09-02
 
 Dependency-range patch, no code. `stapel-categories<0.13` -> `<0.14` and the
