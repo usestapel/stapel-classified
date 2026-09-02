@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.8.1] — 2026-09-02
+
+Patch. Caps and one floor — no code, no model, no migration, no payload.
+
+- `stapel-categories<0.12` -> `<0.13`
+- `stapel-listings<0.13` -> `<0.14`
+- `stapel-shop>=0.2.14` -> `>=0.2.18`
+
+The shop floor moves WITH the two caps, and that is the whole point: shop
+carries its own `stapel-categories<0.12` / `stapel-listings<0.13`, so without
+it pip resolves a shop that caps the members back down and the widening above
+does nothing, silently. This composite has now recorded that exact shape four
+times.
+
+**stapel-categories 0.12.0** adds the two public tree reads a storefront walks
+this composite's catalogue with: `roots` (top-level categories without pulling
+the whole table) and `by-slug/<slug>` (the storefront's own URL vocabulary
+resolved server-side). A composite whose subject is a browsable classified
+catalogue cannot hold a fleet under the release that lets the tree be walked
+from its first rung — held at `<0.12`, rendering a row of category tiles means
+listing every category and filtering client-side, measured on a live stand as
+a 15-page, 614 KB walk behind a cold catalogue page.
+
+**stapel-listings 0.13.0** makes `listings_reproject_features` repair a
+listing field by field. This composite's own `stapel-listings` block already
+calls that command the only way a write-time snapshot becomes true again —
+and until 0.13.0 one attribute that no longer validated skipped the whole row,
+so every other field kept whatever an older engine left there. Measured: 12
+listings stuck on a stale shape for reasons unrelated to the fields broken on
+screen. Capping under it keeps the repair this composite depends on
+half-working.
+
+Both floors are unchanged: `stapel-categories>=0.11` (`Feature.visibility`)
+and `stapel-listings>=0.12.1` (the identifier attribute never leaving the
+module).
+
 ## 0.8.0 — 2026-09-02
 
 Minor (pre-1.0: minor = breaking). Four member bumps that only mean anything

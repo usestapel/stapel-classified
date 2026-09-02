@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.8.0"
+version = "0.8.1"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -176,7 +176,12 @@ dependencies = [
     # >=0.2.14: the release that widens shop's own `stapel-categories<0.9`.
     # Without it the two lines have no common solution and pip resolves
     # categories back under this composite's floor.
-    "stapel-shop>=0.2.14,<0.3",
+    # >=0.2.18: the release that widens shop's own `stapel-categories<0.12`
+    # and `stapel-listings<0.13`. Without moving this floor the two lines
+    # below are inert — pip resolves a shop that caps the members back down,
+    # and the widening above does nothing, silently. This composite has
+    # recorded that exact shape four times.
+    "stapel-shop>=0.2.18,<0.3",
     # >=0.8.1,<0.9, and the floor moves with the cap for the usual reason.
     # 0.8.0 stops keying a catalog re-import on the SLUG: an imported
     # category's slug comes from the source catalogue's node path, so a
@@ -221,7 +226,17 @@ dependencies = [
     # resolved feature. Under the old range the catalogue has no field in
     # which to say that a VIN is not public, so the axis the other three
     # members enforce is one nobody can ever set.
-    "stapel-categories>=0.11,<0.12",
+    # >=0.11,<0.13 as of 0.8.1: categories 0.12.0 adds the two public tree
+    # reads a storefront walks this composite's catalogue with — `roots`
+    # (top-level categories without pulling the whole table) and
+    # `by-slug/<slug>` (the storefront's own URL vocabulary resolved
+    # server-side). A composite whose whole subject is a browsable classified
+    # catalogue cannot cap a fleet under the release that lets the tree be
+    # walked from its first rung: held at <0.12, the only way to render a row
+    # of category tiles is to list every category and filter client-side —
+    # measured on a live stand as a 15-page, 614 KB walk behind a cold
+    # catalogue page. The floor stays at 0.11 (`Feature.visibility`).
+    "stapel-categories>=0.11,<0.13",
     "stapel-vocabularies>=0.1,<0.2",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
@@ -245,7 +260,17 @@ dependencies = [
     # the pin on stapel-attributes states the version it actually needs.
     # A fleet able to resolve back onto 0.11 publishes the VIN again, and
     # nothing errors while it does.
-    "stapel-listings>=0.12.1,<0.13",
+    # >=0.12.1,<0.14 as of 0.8.1: listings 0.13.0 makes
+    # `listings_reproject_features` — the command this block already calls the
+    # only way a write-time snapshot becomes true again — repair a listing
+    # FIELD BY FIELD. Until it did, one attribute that no longer validated
+    # skipped the whole row, so every other field on that listing kept
+    # whatever an older engine left there; measured on a live stand as 12
+    # listings stuck on a stale shape for reasons unrelated to the fields
+    # broken on screen. Capping a fleet under it keeps the repair this
+    # composite depends on half-working. The floor stays at 0.12.1 (the
+    # identifier attribute never leaving the module).
+    "stapel-listings>=0.12.1,<0.14",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for
