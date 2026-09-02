@@ -72,9 +72,9 @@ def test_system_checks_report_no_errors():
 
     Three warnings are expected here and are properties of the harness, not
     of the composite: ``access.W005`` (no stapel-auth, so no step-up factor),
-    ``blacklist.W002`` (LocMemCache) and ``chat.W001`` (one scope, because a
-    marketplace is not multi-tenant). Anything else — and any ERROR at all —
-    fails.
+    ``blacklist.W002`` and ``listings.W001`` (both LocMemCache) and
+    ``chat.W001`` (one scope, because a marketplace is not multi-tenant).
+    Anything else — and any ERROR at all — fails.
 
     ``classified.W001`` was expected here until 0.3.2 and must now be ABSENT:
     stapel_profiles is mounted, so this host has the block provider its
@@ -103,8 +103,15 @@ def test_system_checks_report_no_errors():
             #     scope. A marketplace is not multi-tenant, so that is the
             #     right answer here and stapel-workspaces is deliberately not
             #     in this host.
+            #   listings.W001 — the harness runs on LocMemCache, where
+            #     stapel-listings holds its view-deduplication window. It is
+            #     the same harness property as blacklist.W002 above and is
+            #     harmless in ONE process; a real deployment running several
+            #     workers under LocMem would count one viewer once per
+            #     worker, which is what the check exists to say out loud.
             "stapel_moderation.W006",
             "stapel_chat.W001",
+            "stapel_listings.W001",
         )
     ]
     assert unexpected == [], [str(f) for f in unexpected]

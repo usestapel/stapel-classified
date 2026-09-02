@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.8.7"
+version = "0.9.0"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -185,7 +185,12 @@ dependencies = [
     # listings 0.14 — the floor moves with the caps above for the recorded
     # reason: without it pip resolves a shop that caps the members back down
     # and the widening above does nothing, silently.
-    "stapel-shop>=0.2.22,<0.3",
+    # >=0.2.24: the floor moves with the listings cap above, and it has to.
+    # shop capped stapel-listings<0.16 of its own, so a fleet resolving this
+    # composite against an older shop cannot install the listings this
+    # composite now requires — the cap in a SIBLING is the wall, which is the
+    # shape this file has hit four times and names each time.
+    "stapel-shop>=0.2.24,<0.3",
     # >=0.8.1,<0.9, and the floor moves with the cap for the usual reason.
     # 0.8.0 stops keying a catalog re-import on the SLUG: an imported
     # category's slug comes from the source catalogue's node path, so a
@@ -315,7 +320,19 @@ dependencies = [
     # `cards._base_card` passes the value through untouched), so the null
     # reaches a storefront as a null and "price not stated" is renderable
     # without a client guessing what 0 meant.
-    "stapel-listings>=0.13.3,<0.16",
+    # <0.18, not <0.16: fix pack 7's listings half, and this composite is the
+    # module that has to know about it, because two of the three change what
+    # PUBLISHES. 0.16 refuses a draft with no coordinates
+    # (REQUIRE_LOCATION_ON_PUBLISH, on by default) and derives the published
+    # `location_label` from the pin through `geo.reverse_geocode` — a
+    # Function this preset already mounts the provider for (preset.py), which
+    # is exactly why the coupling is this composite's to declare. 0.17 adds
+    # `GET listings/engagement`, the batched per-viewer overlay a card built
+    # from the SEARCH index needs: the stored card can carry neither a flag
+    # that differs per reader nor a counter that moves faster than a document
+    # re-indexed on a listing event, and this composite is the module that
+    # registers listings as a stapel-search source.
+    "stapel-listings>=0.13.3,<0.18",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for
@@ -359,7 +376,15 @@ dependencies = [
     # package, 0.10.0's wheel omitted the package from its explicit
     # packages list — and on either, every suggest request with a query
     # 500s.
-    "stapel-search>=0.10.5,<0.11",
+    # >=0.11.1,<0.12 as of composite 0.9.0: a category suggestion carries its
+    # own destination (`count_scope` + `query`). Before it, the two row kinds
+    # meant different things by `count` and the answer never said which, so a
+    # storefront had one rule for both and it was wrong for every name row —
+    # a place row's honest count followed with the typed text opens a page
+    # that does not have those listings. Purely additive on the wire, and the
+    # FLOOR moves rather than only the cap because the storefront contract
+    # this composite documents now names those two fields.
+    "stapel-search>=0.11.1,<0.12",
     # >=0.4, not >=0.3: 0.4.0 is where stapel_moderation subscribes
     # 'user.merged' — a merge re-parents the reports and decisions an account
     # holds, and an app that only knows 'user.deleted' strands them. Under

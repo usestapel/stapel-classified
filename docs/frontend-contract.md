@@ -417,6 +417,70 @@ UI rules:
   /classified/api/v1/conversations` asks it not at all — so a block-store
   outage cannot stand between somebody and their own correspondence.
 
+## 5b. Engagement on a card, and where a suggestion leads
+
+Two things a storefront cannot assemble correctly from the search answer
+alone. Both are seams this composite owns, because it is the module that
+registers listings as a stapel-search source.
+
+### 5b.1 The per-viewer overlay — `GET /listings/api/v1/listings/engagement?ids=…`
+
+A SERP card comes out of the SEARCH index. That index cannot carry either
+per-viewer flag — `viewed` and `is_favorited` are a property of the READER,
+not of the listing — and it must not carry `view_count`, which moves far
+faster than a document re-indexed on a listing event. So the grid draws the
+cards from search and asks listings, ONCE for the whole page, for the three
+things that are about the person looking.
+
+```
+GET /listings/api/v1/listings/engagement?ids=412,413,414
+{"items": {"412": {"view_count": 37, "viewed": true,  "is_favorited": false},
+           "413": {"view_count":  4, "viewed": false, "is_favorited": true}}}
+```
+
+- `AllowAny`. `view_count` is public, and both per-viewer flags answer
+  `null` for a guest — so this is the SAME request signed in or not, and a
+  guest's grid is not a second code path.
+- `viewed` / `is_favorited` are THREE-STATE: `true`, `false`, `null`. `null`
+  is "not knowable for this reader", which is a different sentence from "no".
+  Grey out a card on `true`; render nothing different on `null`.
+- An id with no listing is simply ABSENT from `items` — do not read a missing
+  key as zeros.
+- Capped at `STAPEL_LISTINGS["ENGAGEMENT_BATCH_LIMIT"]` ids (100) per call:
+  one page of cards, not a crawl of the board.
+- The same three fields are already ON the card and detail serializers of
+  the listings REST reads (`GET /listings/api/v1/listings/…`). This endpoint
+  exists for the grid that does NOT come from there.
+
+Opening a listing detail (`GET /listings/api/v1/listings/{id}/`) is what
+COUNTS a view — the client does not post anything. `viewed` on that response
+is the state BEFORE the open, so the read that first sees a listing answers
+`false` and the next one answers `true`.
+
+### 5b.2 A suggestion carries its own destination
+
+Every row of `GET /search/api/v1/suggest` now says what its `count` counted
+and which page that count describes:
+
+```json
+{"name": "Автомобили", "category": "141/151", "count": 2,
+ "count_scope": "category", "query": {"category": "141/151"}}
+```
+
+- `count_scope: "category"` — a NAME row (`match` exact/prefix/word/substring)
+  or a `vector` row. It is a PLACE, and its count ignores the typed text.
+- `count_scope: "query_in_category"` — a goods-driven row (`match:
+  "listings"`), offered because documents matching the query live there. Its
+  count is already text-conditioned.
+- `query` is the exact `/query` parameter set the count was computed for.
+  **Send it verbatim** (plus your own `type`/`lang`/paging) when the buyer
+  follows the row.
+
+Assembling those parameters yourself re-opens the defect this exists to
+close: a storefront that appended the typed text to every row's link sent a
+place row's honest «2» to a page filtered by BOTH, and the page was empty —
+no listing under «Одежда, обувь, аксессуары» spells the category's own name.
+
 ## 6. Failure vocabulary, in one place
 
 | Status | Key | Retryable | Copy |

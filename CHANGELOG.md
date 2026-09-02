@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.9.0] — 2026-09-03
+
+### Changed
+
+- `stapel-listings` cap `<0.16` -> `<0.18` and `stapel-search` `>=0.10.5,<0.11`
+  -> `>=0.11.1,<0.12`. The search FLOOR moves, not only the cap: the
+  storefront contract this composite documents now names `count_scope` and
+  `query` on a suggestion row, and a fleet resolving to 0.10.x would install
+  a documented contract that is not served.
+
+### Added
+
+- Frontend contract §5b: the per-viewer engagement overlay
+  (`GET listings/engagement`) a card built from the SEARCH index needs, and
+  the suggestion row's own destination. Both are seams this composite owns —
+  it is the module that registers listings as a stapel-search source — and
+  both are things a storefront was previously assembling by guess. The guess
+  it made for suggestions was wrong for every name row.
+
 ## [0.8.7] — 2026-09-03
 
 Dependency-range patch, no code. `stapel-categories<0.15` -> `<0.16`, and

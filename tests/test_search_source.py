@@ -136,6 +136,10 @@ def test_mapper_carries_title_attributes_into_the_text_arm(db, user, category_tr
         title_draft="A car",
         description_draft="A perfectly ordinary car.",
         price_draft=Decimal("100.00"),
+        # A place, because stapel-listings 0.16 refuses to publish without
+        # one (REQUIRE_LOCATION_ON_PUBLISH).
+        lat_draft="49.6116",
+        lon_draft="6.1319",
         features_draft={"make": {"type": "string", "value": "apple"}},
     )
     publish_listing(listing)

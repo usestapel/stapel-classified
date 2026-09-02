@@ -232,6 +232,9 @@ def ref_listing(db, user, phones_vocabulary):
         title_draft="A phone",
         description_draft="A perfectly ordinary phone.",
         price_draft=Decimal("100.00"),
+        # A place: stapel-listings 0.16 refuses to publish without one.
+        lat_draft="49.6116",
+        lon_draft="6.1319",
         features_draft={"vendor": {"type": "ref_select", "value": ["apple"]}},
     )
     publish_listing(listing)
