@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.3"
+version = "0.10.4"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -462,7 +462,21 @@ dependencies = [
     # nearby/all bands behind a flag, and wires the alias rung that actually
     # reaches phonetic brands. This preset declares corpora and reads none of
     # that — the cap was the only thing in front of it.
-    "stapel-search>=0.11.1,<0.13",
+    # <0.15 as of composite 0.10.4: stapel-search 0.14.0 draws the facet plan
+    # from the categories a result set actually contains. Under the old cap
+    # this composite's own storefront is the deployment where the defect was
+    # MEASURED — a branch category page and a text search offering zero
+    # filters over listings that all carry a manufacturer — so the cap is
+    # what stands between the fix and the only fleet that has the shape.
+    # The span carries 0.13.0's public geo grid with it: an anonymous
+    # reader's `distance_km` is measured against the same ~1.1km grid the
+    # public card publishes, which is the search half of the coarsening
+    # stapel-listings 0.21.0 already did on the card (composite 0.10.3).
+    # This preset declares SOURCES and VECTOR_CORPORA and configures neither
+    # facets nor geo precision: both new settings ship with defaults measured
+    # on the reference stand, and a composite restating them would freeze a
+    # number the library is entitled to re-measure.
+    "stapel-search>=0.11.1,<0.15",
     # >=0.4, not >=0.3: 0.4.0 is where stapel_moderation subscribes
     # 'user.merged' — a merge re-parents the reports and decisions an account
     # holds, and an app that only knows 'user.deleted' strands them. Under

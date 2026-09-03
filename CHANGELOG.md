@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.10.4] — 2026-09-03
+
+Patch. Cap only: `stapel-search` admits 0.13 and 0.14.
+
+**0.14.0 is the release this composite's own storefront needs.** A UX walker on
+the classified stand measured the filter panel offering **zero** groups on
+`/c/telefony` (46 listings), on `/c/elektronika` (52) and on `?q=iPhone` (14),
+against 12 on the one leaf `/c/mobilnye-telefony` — with «Для этого поиска
+фильтров нет» printed over forty-six phones that all carry a manufacturer. The
+cause was that `facet_plan` asks `categories.features` for one category and
+that Function resolves own + ANCESTOR-inherited features, so a branch owns no
+axes (its leaves do) and a text query names no category at all. 0.14.0 draws
+the plan from the categories the result set is actually made of, ranks them by
+predicted coverage, and withholds and NAMES a group with thin support. The
+`stapel-classified` catalogue is the shape that produced the measurement: under
+`elektronika`, seven categories hold a listing and one of them holds 88.5% of
+them.
+
+0.13.0 rides along in the same span: an anonymous reader's `distance_km` is
+now measured against the same ~1.1km grid the public card publishes, which is
+the search half of the coarsening `stapel-listings` 0.21.0 did on the card
+(composite 0.10.3).
+
+Nothing in this composite changes. It declares `SOURCES` and `VECTOR_CORPORA`
+and configures neither facets nor geo precision — both new settings ship with
+defaults measured on the reference stand, and a composite restating them would
+freeze a number the library is entitled to re-measure.
+
 ## [0.10.3] — 2026-09-03
 
 Patch. Cap only: `stapel-listings` admits 0.21.
