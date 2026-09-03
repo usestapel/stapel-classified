@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.10.5] — 2026-09-04
+
+Patch. Cap only: `stapel-categories` admits 0.19.
+
+stapel-categories 0.19.0 gives every node a `children_as` — whether its
+children are real subcategories, drawn as a tile grid of destinations, or a
+partition of ONE attribute template (new/used, buy/sell/rent, boys/girls) that
+belongs on a chip row over the parent's own feed. It ships the derivation
+command that answers it for an imported catalogue and
+`GET /categories/api/v1/tree/`, the whole visible tree nested in one cached
+call. Additive throughout: two new columns with defaults, one new key on the
+public category payload, one new endpoint.
+
+This preset reads none of it — no comm Function signature moved, and how a
+storefront draws a level is the storefront's business. The cap was the only
+thing standing in front of it, and the catalogue this composite is the shape
+of is exactly what the release was cut for: 7 real-estate parents split
+Куплю/Продам/Сдам/Сниму, cars split Новые/С пробегом, and ~148 more parents
+whose children carry near-identical attribute templates.
+
 ## [0.10.4] — 2026-09-03
 
 Patch. Cap only: `stapel-search` admits 0.13 and 0.14.

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.4"
+version = "0.10.5"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -289,7 +289,20 @@ dependencies = [
     # plan now reports the overrides the load will refuse instead of printing
     # a clean plan for a load that errors. Loader behaviour only; this preset
     # runs no catalogue load — the cap was the only thing in front of it.
-    "stapel-categories>=0.11,<0.19",
+    # <0.20, not <0.19: stapel-categories 0.19.0 gives every node a
+    # `children_as` — whether its children are real subcategories (a tile grid
+    # of destinations) or a partition of ONE attribute template (new/used,
+    # buy/sell/rent, boys/girls) that belongs on a chip row over the parent's
+    # own feed — with the derivation command that answers it for an imported
+    # catalogue and `GET /categories/api/v1/tree/`, the whole visible tree
+    # nested in one cached call. Additive: two columns with defaults, one key
+    # on the public category payload, one endpoint. This preset reads none of
+    # it — no Function signature moved and the presentation column is a
+    # storefront's business — so the cap was again the only thing in front of
+    # a catalogue this composite's own stand is the shape of: 7 real-estate
+    # parents split Куплю/Продам/Сдам/Сниму, and ~148 more parents whose
+    # children carry near-identical templates.
+    "stapel-categories>=0.11,<0.20",
     # >=0.1.3 as of composite 0.8.2: the release where the QUERY_EXPANDER
     # seam exists. The preset now STATES that key, and an AppSettings that
     # has never heard of it must not be handed it — the floor names the
