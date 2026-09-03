@@ -180,6 +180,12 @@ SETTINGS_DEFAULTS = {
         "VECTOR_CORPORA": {
             "category": "stapel_classified.vector_corpora.category_corpus",
             "vocab_label": "stapel_vocabularies.vector.label_corpus",
+            # The inline `select` option catalogue — colours, conditions,
+            # sizes. Neither of the two above covers it: `vocab_label` holds
+            # vocabulary TERMS (brands, models), and an option written in a
+            # feature's own config is not a term. Query understanding needs
+            # it to answer «красные» with «Красный».
+            "facet_option": "stapel_classified.vector_corpora.facet_option_corpus",
         },
     },
     "STAPEL_MODERATION": {

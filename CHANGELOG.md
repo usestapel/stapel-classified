@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.10.0] — 2026-09-03
+
+Minor. A third vector corpus: **`facet_option`** — the inline `select` option
+catalogue, registered in `VECTOR_CORPORA` beside `category` and `vocab_label`.
+
+The gap it closes is the one the owner's own example falls into. «красные
+штаны» has to resolve `Цвет = Красный`, and until now nothing had embedded
+that string. `vocab_label` carries stapel-vocabularies TERMS, which is where
+brands and models live (a `ref_select` feature names a vocabulary and a
+level); a colour, a condition or a size is not a term at all — it is an
+option written inline in the feature's own `config`, and no corpus held it.
+The deterministic rung answers «красный» (the option code IS the
+transliterated slug of the caption, so `krasnyy` falls straight out of
+`text.transliterate`), but «красные» is morphology, `text.py` stems nothing
+by design, and the vector rung had nothing to search.
+
+Deduplicated by `(slug, value)`: `Feature.slug` is unique only among ROOT
+features, so one option is offered all over the tree — on the live stand
+51,306 option rows dedupe to 25,038 distinct pairs, and embedding them
+undeduped would double the corpus for nothing. The payload carries the whole
+filter (`slug`, `value`, `label`, `feature`), so a hit becomes
+`f.<slug>=<value>` without a second lookup.
+
+Additive: the registry MERGES, the net stays behind
+`STAPEL_SEARCH["VECTOR_SUGGEST"]` (default off), and the provider only runs
+inside `manage.py search_vector_index --kind facet_option`. Minor rather than
+patch because the registry a host reads is not the one it read before.
+
 ## [0.9.5] — 2026-09-03
 
 Patch. Caps only: `stapel-categories` admits 0.17, `stapel-listings` admits

@@ -54,4 +54,66 @@ def category_corpus():
         }
 
 
-__all__ = ["category_corpus"]
+def facet_option_corpus():
+    """One entry per distinct ``(slug, value)`` an inline ``select`` feature
+    offers — the option catalogue a free-text query is matched against.
+
+    This corpus exists because the other two cannot answer for it.
+    ``vocab_label`` embeds stapel-vocabularies TERMS, which is where brands
+    and models live (``ref_select`` features name a vocabulary and a level);
+    a colour, a condition or a size is not a term at all — it is an option
+    written inline in the feature's own config, and nothing embedded it.
+    Without this provider the deterministic rung answers «красный» and the
+    vector rung has nothing to search for «красные», which is the exact
+    query a person types.
+
+    The embedded text is the bare label for the same reason
+    ``category_corpus`` embeds the bare name: it is the string the buyer's
+    word is a variant OF. The payload carries the whole filter, so a hit
+    becomes ``f.<slug>=<value>`` without a second lookup.
+
+    Deduplicated by ``(slug, value)``: one option is offered by many
+    categories (``color`` appears under most of the tree) and embedding it
+    once per category would multiply 25k vectors into 51k identical ones.
+    """
+    from stapel_categories.models import Category  # noqa: F401  (app loaded)
+    from stapel_categories.models import Feature
+
+    seen: set[tuple[str, str]] = set()
+    rows = Feature.objects.filter(deleted=False, is_test=False).values(
+        "slug", "name", "config"
+    )
+    for row in rows:
+        config = row["config"] or {}
+        if config.get("type") != "select":
+            continue
+        options = config.get("options")
+        if not isinstance(options, list):
+            continue
+        slug = row["slug"]
+        for option in options:
+            if not isinstance(option, dict):
+                continue
+            value = option.get("value")
+            label = option.get("label")
+            # An option with no label has nothing to embed, and one with no
+            # value cannot become a filter — skip rather than invent either.
+            if not value or not label:
+                continue
+            identity = (slug, str(value))
+            if identity in seen:
+                continue
+            seen.add(identity)
+            yield {
+                "key": f"{slug}={value}",
+                "text": str(label),
+                "payload": {
+                    "slug": slug,
+                    "value": str(value),
+                    "label": str(label),
+                    "feature": row["name"] or slug,
+                },
+            }
+
+
+__all__ = ["category_corpus", "facet_option_corpus"]
