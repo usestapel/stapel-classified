@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.10.3] — 2026-09-03
+
+Patch. Cap only: `stapel-listings` admits 0.21.
+
+stapel-listings 0.21.0 stops the public listing card and detail read handing an
+anonymous reader the seller's exact point — `geohash` at precision 8 (~38m x
+19m) beside `lat`/`lon` at six decimal places (~11cm). The public payload is now
+an area (~1.1km) plus `geo_precision_km`; the owner, staff and the service
+transport keep the exact pin.
+
+Inert in this composite, in both directions. `cards.py::_base_card` carries no
+coordinates at all, and `search_sources.py` builds its index input from the
+`listings.search_documents` payload — the MODEL, not the read serializer — so
+the index keeps the true point and `distance_km` stays exactly as accurate as
+before. The cap was the only thing standing in front.
+
 ## [0.10.2] — 2026-09-03
 
 Patch. Cap only: `stapel-search` admits 0.12.
