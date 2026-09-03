@@ -374,7 +374,24 @@ dependencies = [
     # cares: it is the module that registers listings as a search source, so
     # the re-projection is what makes the SERP card follow. `category_id`
     # also gained a model-field validator (an id, never a search path).
-    "stapel-listings>=0.13.3,<0.20",
+    # <0.21, not <0.20: stapel-listings 0.20.0 gives a seller a way out of
+    # every status the cabinet can put a listing into. The owner API used to
+    # expose two lifecycle edges, `archive` and `complete`, and both are
+    # exits — so ARCHIVED, PAUSED, EXPIRED, SOLD, REJECTED and BLOCKED were
+    # one-way doors and DELETE was the only call that still answered, which
+    # is exactly what a live fleet's sellers reported. `OWNER_TRANSITIONS`
+    # plus one `transition` route closes it, and the owner card now carries
+    # `available_transitions` so a cabinet reads the moves off the server
+    # that owns the state machine instead of re-deriving them.
+    #
+    # It also renames the never-submitted `moderation_status` default from
+    # `pending` to `not_submitted` (167 drafts on that stand claimed to be
+    # under review with no moderation case behind any of them). This
+    # composite cares about that one directly: it is the module that
+    # registers `listing` as a moderation target and builds the subject
+    # cards, and `cards.py` copies `moderation_status` through verbatim — a
+    # pass-through, so the new value rides it without a shape change.
+    "stapel-listings>=0.13.3,<0.21",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for
@@ -441,7 +458,20 @@ dependencies = [
     # non-compliant draft in the composer instead of publishing it and
     # reviewing after. Both are additive; nothing this module calls changed
     # shape.
-    "stapel-moderation>=0.4,<0.6",
+    # <0.7, not <0.6: stapel-moderation 0.6.0 adds `rescreen_stuck_cases`,
+    # the beat job that recovers a case nothing else can move. `needs_review`
+    # was terminal in practice on any deployment without a staffed queue —
+    # `sweep_stale_cases` fills the human queue and nothing drained it — and
+    # a live fleet had 51 cases parked there, the oldest two days old. The
+    # same mechanism makes an owner's EDIT re-screen: `open_case` dedups on
+    # OPEN_STATES, so editing a listing whose case was still queued changed
+    # the content under a verdict about different content.
+    #
+    # 0.6.0 also stops a screening that resolved none of a listing's photos
+    # from reporting as a full screening. This composite registers `listing`
+    # with `media: True`, so it is the registration that makes that path
+    # live here.
+    "stapel-moderation>=0.4,<0.7",
     # >=0.6.1 is LOAD-BEARING, not hygiene: 0.6.1 is where chat began
     # refusing a blocked pair the THREAD at create_direct, and 0.4.0
     # deleted this package's own pre-creation door on that promise.

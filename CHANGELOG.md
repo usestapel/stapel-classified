@@ -2,6 +2,27 @@
 
 ## [0.10.0] — 2026-09-03
 
+Caps, in the same release: `stapel-listings` admits 0.20 and
+`stapel-moderation` admits 0.6 — the two libraries that answer a defect
+report from a live fleet's own seller, and this composite is what registers
+both surfaces.
+
+listings 0.20.0 gives a seller a way out of every status the cabinet can put
+a listing into. The owner API exposed two lifecycle edges, `archive` and
+`complete`, and both are exits, so ARCHIVED / PAUSED / EXPIRED / SOLD /
+REJECTED / BLOCKED were one-way doors and `DELETE` was the only call that
+still answered. It also renames the never-submitted `moderation_status`
+default to `not_submitted`; `cards.py` passes that field through verbatim, so
+the new value rides the subject card without a shape change.
+
+moderation 0.6.0 adds `rescreen_stuck_cases`, which recovers a case nothing
+else could move — `needs_review` was terminal in practice wherever the human
+queue is unstaffed — makes an owner's edit re-screen instead of riding the
+verdict reached about the pre-edit content, and stops a screening that
+resolved none of a listing's photos from reporting as a full screening. This
+composite registers `listing` with `media: True`, so that last one is live
+here by registration.
+
 Minor. A third vector corpus: **`facet_option`** — the inline `select` option
 catalogue, registered in `VECTOR_CORPORA` beside `category` and `vocab_label`.
 
