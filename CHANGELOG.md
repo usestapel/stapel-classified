@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.9.4] — 2026-09-03
+
+Patch. Cap only: `stapel-attributes` admits 0.9.
+
+stapel-attributes 0.9.0 changes one rule semantic — a VALUE predicate (`in` /
+`not_in`) no longer matches a controller that reads EMPTY, so a
+`require when X not_in […]` rule stops firing before anyone has answered `X`.
+Two UX walkers had hit that wall on an imported catalogue: a field starred and
+refusing "Next" while its own help line said it was needed only *if* another
+field said so, with that field untouched.
+
+This module composes categories and listings rather than evaluating rules
+itself, so the cap moves for one reason: a fleet installs ONE attributes
+version, and a member still capped at `<0.9` pins the whole deployment to the
+engine with the defect. The suite is green against 0.9.0 with no edit.
+
 ## [0.9.3] — 2026-09-03
 
 ### Fixed

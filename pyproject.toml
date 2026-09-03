@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.9.3"
+version = "0.9.4"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -145,7 +145,12 @@ dependencies = [
     # no way to mark the field, every consumer publishes it, and the fix is
     # invisible because nothing errors. The three members below all require
     # 0.8 themselves.
-    "stapel-attributes>=0.8.1,<0.9",
+    # <0.10 as of stapel-classified 0.9.4: stapel-attributes 0.9.0 changes one
+    # rule semantic — `in` / `not_in` no longer match a controller that reads
+    # EMPTY. This module composes categories + listings rather than evaluating
+    # rules itself; the cap moves so the fleet can install one attributes
+    # version, and the suite is green on 0.9.0 unchanged.
+    "stapel-attributes>=0.8.1,<0.10",
     # >=0.4, not >=0.2: 0.4.0 is where ALLOW_ANONYMOUS_WRITES exists at all.
     # A fleet that declares it under the old range gets an inert setting, so
     # the floor moves with the cap rather than leaving a deployment able to
