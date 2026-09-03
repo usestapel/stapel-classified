@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.9.2] — 2026-09-03
+
+### Changed
+
+- `stapel-categories` cap `<0.16` -> `<0.17` and `stapel-shop` floor
+  `>=0.2.24` -> `>=0.2.25` (shop's own categories cap moves with it). Ranges
+  only. categories 0.16.0 splits the public catalogue from the revision-SYNC
+  feed the two shared one URL for; the comm Functions this composite's preset
+  wires — `categories.features`, `.path`, `.names`, `.children`, `.suggest` —
+  are untouched.
+
 ## [0.9.1] — 2026-09-03
 
 ### Changed
