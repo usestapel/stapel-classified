@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.1"
+version = "0.10.2"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -449,7 +449,13 @@ dependencies = [
     # that does not have those listings. Purely additive on the wire, and the
     # FLOOR moves rather than only the cap because the storefront contract
     # this composite documents now names those two fields.
-    "stapel-search>=0.11.1,<0.12",
+    # <0.13, not <0.12: stapel-search 0.12.0 stops the filtered ANN answering
+    # short (one HNSW index serves every corpus, so a kind-scoped search
+    # silently truncated — the isolated arm lost 75% of its recall), adds the
+    # nearby/all bands behind a flag, and wires the alias rung that actually
+    # reaches phonetic brands. This preset declares corpora and reads none of
+    # that — the cap was the only thing in front of it.
+    "stapel-search>=0.11.1,<0.13",
     # >=0.4, not >=0.3: 0.4.0 is where stapel_moderation subscribes
     # 'user.merged' — a merge re-parents the reports and decisions an account
     # holds, and an app that only knows 'user.deleted' strands them. Under

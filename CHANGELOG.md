@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.2] — 2026-09-03
+
+Patch. Cap only: `stapel-search` admits 0.12.
+
+stapel-search 0.12.0 stops the filtered ANN answering short — one HNSW index
+serves every corpus, so a kind-scoped search truncated silently and the
+isolated vector arm lost 75% of its recall. It also adds the nearby/all bands
+and the alias rung, both behind flags that default off. This preset declares
+corpora and reads none of it — the cap was the only thing standing in front.
+
 ## [0.10.1] — 2026-09-03
 
 Patch. Cap only: `stapel-categories` admits 0.18.
