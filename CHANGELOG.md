@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.9.5] — 2026-09-03
+
+Patch. Caps only: `stapel-categories` admits 0.17, `stapel-listings` admits
+0.18/0.19.
+
+stapel-categories 0.17.0 lets a per-category feature OVERRIDE carry its own
+display `name` — both halves of the fixture round trip dropped it, so an
+override rendered the ROOT's label (measured on one live catalogue as 566 of
+the 760 `brand` leaves asking a question in another category's words) — and
+hardens `categories.features` / `.children` so a malformed id answers the
+`LookupError` their contracts promise instead of a 500.
+
+stapel-listings 0.18/0.19 land in one release. `listings_reproject_features`
+can BUILD a missing projection: it selected `exclude(features=[])`, keying the
+population on its own OUTPUT, so a listing carrying a draft and no projection
+was never examined, and a live fleet had 12 published rows serving an empty
+characteristics table. That repair emits `listing.updated` for every changed
+row in an indexed status — which is exactly why this composite cares, being
+the module that registers listings as a stapel-search source: the re-projection
+is what makes the SERP card follow. `Listing.category_id` also gained a
+model-field validator, so it holds an id and never a search path.
+
+Range moves, no floor moves: no Function signature or preset wiring changes.
+The whole suite is green against both with no edit.
+
 ## [0.9.4] — 2026-09-03
 
 Patch. Cap only: `stapel-attributes` admits 0.9.
