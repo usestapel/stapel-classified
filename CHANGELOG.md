@@ -1,6 +1,19 @@
 # Changelog
 
-## [0.9.2] — 2026-09-03
+## [0.9.3] — 2026-09-03
+
+### Fixed
+
+- Re-cut of 0.9.2, which never reached PyPI: its CI installed stapel-core
+  0.58.0, whose `stapel_core.static.W001` fires on this composite's own test
+  harness — an embedded library's admin assets (stapel-attributes' per-kind
+  config editor) were not reachable by the staticfiles finders, so
+  `collectstatic` would never copy them, the `<script>` would 404, and the
+  page would render fine WITHOUT the editor. The harness now sets
+  `STATICFILES_DIRS` from `embedded_static_dirs()` — the mechanism the check
+  points at, applied rather than allowlisted.
+
+## [0.9.2] — 2026-09-03 (never published)
 
 ### Changed
 

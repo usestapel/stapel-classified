@@ -14,6 +14,13 @@
 def pytest_configure(config):
     from django.conf import settings
 
+    # `embedded_static_dirs`, not `get_staticfiles_dirs`: importing
+    # `stapel_core.django.settings` evaluates a module-level settings read,
+    # which is the very trap `_codegen_settings.py` documents ("inlined, not
+    # imported, to dodge the import-time settings read"). This is the half of
+    # that helper a harness with no static/ directory of its own needs.
+    from stapel_core.staticfiles import embedded_static_dirs
+
     if not settings.configured:
         # stapel_geo is deliberately NOT installed here: its models need
         # the GDAL C stack (same policy as stapel-geo's own non-spatial
@@ -130,6 +137,16 @@ def pytest_configure(config):
                 }
             ],
             STATIC_URL="/static/",
+            # The mechanism `stapel_core.static.W001` points at, applied
+            # rather than allowlisted. An embedded library ships admin
+            # widgets as static files (stapel_attributes' per-kind config
+            # editor is the one this fleet has); unreachable by the
+            # staticfiles finders, `collectstatic` never copies them, the
+            # <script> 404s, and the page renders fine WITHOUT the editor —
+            # no log, no error, and the author concludes the product does
+            # not have the feature. A composite harness that mounts the
+            # admin should be able to find them, and now can.
+            STATICFILES_DIRS=embedded_static_dirs(),
             # URL *names*, not root-relative paths: a mount prefix must not
             # be able to 404 the login redirect (stapel_core.mounts.W001).
             LOGIN_URL="admin:login",
