@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.1] — 2026-09-03
+
+Patch. Cap only: `stapel-categories` admits 0.18.
+
+stapel-categories 0.18.0 makes `--on-conflict fixture-wins` cover a db-only
+edit, not only a db-only deletion, so a catalogue load converges instead of
+stranding a retyped root for ever; and its plan now reports the overrides the
+load will refuse, which it previously printed a clean plan for. Loader
+behaviour only. This preset runs no catalogue load — the cap was the only
+thing standing in front of it.
+
 ## [0.10.0] — 2026-09-03
 
 Caps, in the same release: `stapel-listings` admits 0.20 and
