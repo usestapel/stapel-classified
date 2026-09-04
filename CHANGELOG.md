@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.10.6] — 2026-09-04
+
+Patch. Cap only: `stapel-categories` admits 0.20.
+
+stapel-categories 0.20.0 registers `categories.by_slug` — root->leaf ancestry
+for a node named by SLUG, the comm Function stapel-search declared for
+resolving a `category=avtomobili` segment and which nothing in the fleet
+answered until this release, so every slug segment degraded. It also gives a
+node drawn as a chip row a `children_axis_label`: the name of the axis its
+children split on, an optional translation key on the public category payload
+and the tree endpoint. Additive throughout — a new Function, one new column
+with a blank default, one new key; no existing signature moved.
+
+This preset reads neither, and states neither. It does not have to: it mounts
+`stapel_categories` and `stapel_search` in one process, registration happens
+on import from `stapel_categories/apps.py:ready()`, and the search module
+already resolves through the canonical name. So on a stand of this shape the
+cap was the whole distance between a slug address that resolves and one that
+degrades — which is why this is a cap-only release and nothing else here
+changed.
+
 ## [0.10.5] — 2026-09-04
 
 Patch. Cap only: `stapel-categories` admits 0.19.
