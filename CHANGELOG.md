@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.10.11] — 2026-09-05
+
+Cap-only. Two dependency lines move; nothing in this composite changes.
+
+`stapel-categories` widens from `<0.21` to `<0.22`. 0.21.0 makes
+`load_catalog` detect and block a feature-slug rename inside a catalogue
+reload by default (`--rename-features` to perform it, handing the
+listings-side half to the comm Function named by the new
+`FEATURE_RENAME_HOOK` setting; `--no-hook` to apply one with nothing to
+move). This composite calls none of the new surface directly — `load_catalog`
+is an operator action against a reviewed fixture, the same shape as
+`load_vocabulary` in CONFIG.MD — but the fleet running this composite's own
+stand (the real-estate and ~148-parent catalogue this file already describes
+above) is exactly the one that reloads it, and this is the release that stops
+a renamed slug from silently stranding stored feature answers on that reload.
+
+`stapel-listings` widens from `<0.22` to `<0.23`. 0.22.0 adds the comm
+Function `listings.rename_feature_keys` (the write half of that same rename:
+rewrites the KEY on every affected listing's `features_draft`, keeps the
+value, re-projects and re-emits `listing.updated`), a command that calls it,
+and the `CATEGORY_CHILDREN_FUNCTION` setting it resolves subtrees through.
+This composite calls none of the three.
+
+Both caps move for the protection they give this composite's own catalogue
+reloads, not because any code here reads the new flags — that protection is
+worth having even though it is not exercised by this package's own tests.
+
 ## [0.10.10] — 2026-09-05
 
 Cap-only. Two dependency lines move; nothing in this composite changes.
