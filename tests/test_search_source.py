@@ -527,8 +527,8 @@ def test_the_card_carries_a_spec_summary_line_for_a_listing_with_features(
     reimplemented — so the line a search hit draws and the line the listing's
     own API draws are one rule with one bug surface. `presentation` is what
     stops a card from printing «Кирпичный · 3 · 9»: a bare numeric caption is
-    `name_value` («Year 2015») unless it has a unit, and then it is
-    `value_unit` («120000 км»).
+    `name_value` («Year: 2015») unless it has a unit, and then it is
+    `value_unit` («120\xa0000 км»).
     """
     from stapel_classified.search_sources import map_listing
 
@@ -555,10 +555,18 @@ def test_the_card_carries_a_spec_summary_line_for_a_listing_with_features(
     # No unit on the DAO, so the number needs its feature's name beside it or
     # the card prints a bare «2015» nobody can read.
     assert line[0]["presentation"] == "name_value"
-    assert line[0]["name"] == "Year"
+    # stapel-listings 0.22.2: every `name_value` caption built from a bare
+    # number gets a trailing colon on `name` itself («Модель: 90», not
+    # «Модель 90» glued to the value) — the colon lands in `name` rather than
+    # a new key so a client already joining `name` and `label` with a single
+    # space needs no change.
+    assert line[0]["name"] == "Year:"
     assert "unit" not in line[0]
     # A unit IS the caption's context, so the name is not repeated.
-    assert line[1]["label"] == "120000"
+    # stapel-listings' number formatter groups thousands (non-breaking space)
+    # for any raw stored value at or above 10 000 — deliberately unconditional
+    # on locale, so a year never groups but a mileage this size always does.
+    assert line[1]["label"] == "120\xa0000"
     assert line[1]["unit"] == "km"
     assert line[1]["presentation"] == "value_unit"
 

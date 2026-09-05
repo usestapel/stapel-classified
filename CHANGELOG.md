@@ -1,8 +1,13 @@
 # Changelog
 
-## [0.10.12] — 2026-09-06
+## [0.10.13] — 2026-09-06
 
-Cap-only. One dependency line moves; nothing in this composite changes.
+Cap-only for the composite's own dependency line; the rest of this release is
+the harness catching up to already-admitted sibling releases CI proved it had
+not, in fact, caught up to. `v0.10.12` was tagged and never published: its CI
+run went red on exactly the three gaps below, the new `ci-gate` refused to
+let Publish proceed on a red commit, and this version supersedes it rather
+than reusing the tag.
 
 `stapel-chat` widens from `<0.8` to `<0.9`. 0.8.0 moves presence from the
 session to the account — a guest's browser tab used to inherit a stranger's
@@ -21,6 +26,47 @@ in-process, svc-chat is already running 0.8.1, and the `<0.8` ceiling meant
 the two services in the same fleet were on different majors of a shared
 dependency the moment svc-chat published. Widening the cap ends that skew;
 nothing here starts calling `post_system_message`.
+
+### Fixed — the test harness had drifted from three siblings already inside its own caps
+
+CI on this release's own commit failed before the tag existed: `stapel-core`
+and `stapel-realtime` both cap at `<1.0` here, and `stapel-listings` was
+already widened to `<0.23` by 0.10.11. A fresh install pulls the newest
+release under each cap, and three had shipped real, documented changes this
+repo's fixed local venv had not yet installed, so `make test` stayed green
+locally while CI, which always installs fresh, went red on main.
+
+- `stapel-core` 0.60.4 adds `stapel_core.error_pages.W001`: a host that mounts
+  URLs under `STAPEL_SERVICES` prefixes without
+  `ApiErrorPagesMiddleware` answers an unknown path or wrong method with
+  Django's HTML error page instead of the fleet's JSON envelope. This
+  harness's `MIDDLEWARE` is spelled out by hand (importing `stapel_core.django`
+  pulls DRF in before `settings.configure()` has run), so it does not inherit
+  the middleware automatically the way a preset-driven host does. Added, in
+  the position `COMMON_MIDDLEWARE` puts it: right after `BootGateMiddleware`.
+- `stapel-realtime` 0.2.0 adds `realtime.W005`/`W006` over the presence
+  registry's cache backend and TTL. This composite mounts `stapel_realtime`
+  only for its channel layer — chat's WebSocket substrate — never for
+  realtime's own presence registry, so the registry is meant to be off:
+  `STAPEL_REALTIME['PRESENCE_TTL_S'] = 0` says that outright (silences W005,
+  and is the documented way to do it), and the harness's expected-warnings
+  list in `test_system_checks_report_no_errors` now names the `realtime.W006`
+  that setting announces in its place, the same way it already named
+  `listings.W001` and `blacklist.W002` as properties of this LocMemCache
+  harness rather than composite defects.
+- `stapel-listings` 0.22.2 changes the `name_value` card element two ways:
+  every such caption built from a bare stored number now carries a trailing
+  colon on `name` (`"Year:"`, not `"Year"` — a fix for a caption that used to
+  read as one glued phrase, Д421), and the number formatter groups thousands
+  with a non-breaking space above 10 000 regardless of locale
+  (`"120\xa0000"`, not `"120000"`). This composite calls
+  `decorate_card_elements` rather than reimplementing it, so both changes are
+  the owner's card contract, not a regression; `tests/test_search_source.py`
+  now asserts what that contract actually renders.
+
+None of the three required a settings or behavior change in what this
+composite *serves* — only in what its test harness declares and expects, to
+match sibling releases its own caps already permit.
 
 ## [0.10.11] — 2026-09-05
 

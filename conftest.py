@@ -110,6 +110,14 @@ def pytest_configure(config):
             # worker (stapel_core.boot.W002).
             MIDDLEWARE=[
                 "stapel_core.django.boot.BootGateMiddleware",
+                # stapel-core 0.60.4 (stapel_core.error_pages.W001): this
+                # harness mounts URLs under STAPEL_SERVICES prefixes, and
+                # without this middleware an unknown path or wrong method
+                # under one answers Django's HTML error page instead of the
+                # fleet's JSON envelope. Early so its process_response (Django
+                # runs these in reverse MIDDLEWARE order) runs LAST, after
+                # every other middleware has finished shaping the response.
+                "stapel_core.django.api.error_pages.ApiErrorPagesMiddleware",
                 "django.middleware.security.SecurityMiddleware",
                 "corsheaders.middleware.CorsMiddleware",
                 "django.contrib.sessions.middleware.SessionMiddleware",
@@ -180,6 +188,16 @@ def pytest_configure(config):
                 # conversation where the socket authenticates by cookie
                 # (stapel_chat.E014).
                 "ALLOWED_ORIGINS": ["http://testserver"],
+                # This composite mounts stapel_realtime only for its channel
+                # layer (chat's WebSocket substrate) — never for realtime's
+                # OWN presence registry, which is a different fact from
+                # stapel-chat's PRESENCE_TTL_S above. Left at the module
+                # default (60) this harness's LocMemCache trips
+                # realtime.W005: a per-process cache can't share a presence
+                # lease across workers/services, which is true here and
+                # irrelevant, since nothing reads realtime.is_live. 0 is the
+                # documented way to say the registry is deliberately unused.
+                "PRESENCE_TTL_S": 0,
             },
             # The Postgres backend is the module default and needs Postgres;
             # this harness runs the naive engine on SQLite. The seam is

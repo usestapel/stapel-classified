@@ -70,10 +70,15 @@ def test_system_checks_report_no_errors():
     and the category-path provider, core's mount canon over the URLconf).
     Booting them together is the only way to run them.
 
-    Three warnings are expected here and are properties of the harness, not
-    of the composite: ``access.W005`` (no stapel-auth, so no step-up factor),
-    ``blacklist.W002`` and ``listings.W001`` (both LocMemCache) and
-    ``chat.W001`` (one scope, because a marketplace is not multi-tenant).
+    Warnings expected here are properties of the harness, not of the
+    composite: ``access.W005`` (no stapel-auth, so no step-up factor),
+    ``blacklist.W002`` and ``listings.W001`` (both LocMemCache), ``chat.W001``
+    (one scope, because a marketplace is not multi-tenant), and
+    ``realtime.W006`` (stapel_realtime is mounted only for its channel layer
+    — chat's WebSocket substrate — never for realtime's OWN presence
+    registry; ``PRESENCE_TTL_S`` is 0 here precisely to say that registry is
+    deliberately unused, and W006 is the check announcing that choice out
+    loud rather than realtime.W005 announcing an unconfigured cache).
     Anything else — and any ERROR at all — fails.
 
     ``classified.W001`` was expected here until 0.3.2 and must now be ABSENT:
@@ -112,6 +117,7 @@ def test_system_checks_report_no_errors():
             "stapel_moderation.W006",
             "stapel_chat.W001",
             "stapel_listings.W001",
+            "realtime.W006",
         )
     ]
     assert unexpected == [], [str(f) for f in unexpected]
