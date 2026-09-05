@@ -171,10 +171,28 @@ def _card(payload: dict) -> dict:
     the client resolves a ref the way it resolves every other ref in this
     fleet. Until 0.7.0 it carried one, which is why a SERP row could not show
     a second photo however swipeable the card was.
-    """
-    from .cards import _base_card
 
-    return _base_card(payload)
+    **The spec summary line rides along too** (``features_title`` /
+    ``features_badges``, since 0.10.9). A storefront list card draws one short
+    line of attributes under the title — «2015 · 1.4 · 120 000 км» — and it
+    reads it off the card, because a SERP has no category schema in hand and
+    no budget for a hydration hop per row. Until 0.10.9 the stored card
+    carried title, price, currency, location, images and published_at and
+    nothing else, so that line was blank on every row of every board while
+    both halves of the answer already existed: the owner serves the DAOs, and
+    the owner's own :func:`~stapel_listings.services.features.
+    decorate_card_elements` is the rule that turns a DAO into something a card
+    can print. ``cards.card_features`` calls it; nothing is re-derived here.
+
+    The two lists live BESIDE the base card rather than inside it: a chat
+    header is a header and does not draw a spec line, and ``ListingCardDTO``
+    is this module's published contract for that header. Growing the search
+    card is additive to a stored document; growing the chat card is an API
+    change, and the two are not the same decision.
+    """
+    from .cards import _base_card, card_features
+
+    return {**_base_card(payload), **card_features(payload)}
 
 
 def map_listing(payload: dict):

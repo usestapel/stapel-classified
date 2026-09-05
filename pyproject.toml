@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.8"
+version = "0.10.9"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -211,7 +211,15 @@ dependencies = [
     # shape this file has hit four times and names each time.
     # >=0.2.25: shop's own stapel-categories cap moves with this one, the
     # sibling-cap wall this file has now named seven times.
-    "stapel-shop>=0.2.25,<0.3",
+    # >=0.2.30: the sibling-cap wall again, the eighth time this file names it.
+    # The listings floor below moves to 0.21.3 in composite 0.10.9, and shop
+    # capped `stapel-listings<0.18` through 0.2.26, `<0.20` at 0.2.27 and
+    # `<0.21` at 0.2.28/0.2.29. 0.2.30 is the first release whose own cap
+    # (`<0.22`) admits the listings this composite now requires; held below
+    # it, the two lines have NO common solution and `pip install` answers
+    # ResolutionImpossible pointing at listings, which is not where the wall
+    # is.
+    "stapel-shop>=0.2.30,<0.3",
     # >=0.8.1,<0.9, and the floor moves with the cap for the usual reason.
     # 0.8.0 stops keying a catalog re-import on the SLUG: an imported
     # category's slug comes from the source catalogue's node path, so a
@@ -443,7 +451,15 @@ dependencies = [
     # document it feeds (`search_sources.py`) reads the MODEL, not the
     # serializer, so the index keeps the true point and `distance_km` is
     # unaffected. The change is inert here; the cap is only in the way.
-    "stapel-listings>=0.13.3,<0.22",
+    # >=0.21.3 as of composite 0.10.9, and this is a FLOOR the code needs
+    # rather than a range it was tested in: `cards.card_features` imports
+    # `stapel_listings.services.features.decorate_card_elements`, the owner's
+    # card badge contract, which 0.21.3 is the release of. Borrowing the rule
+    # is the point — a second copy of "how a card writes a value and its unit"
+    # here is the day the two surfaces start printing different lines for one
+    # stored DAO — and a borrowed function has to be declared, or the import
+    # is an AttributeError at the first SERP on an older listings.
+    "stapel-listings>=0.21.3,<0.22",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for

@@ -465,3 +465,155 @@ def test_a_bounded_describe_batch_buys_every_primary_before_any_second():
     # Nothing is asked about twice, and the budget is a ceiling, not a target.
     assert _refs_to_describe(cards, 99) == ["a1", "b1", "c1", "a2", "b2", "a3"]
     assert _refs_to_describe({}, 10) == []
+
+
+# ── the spec summary line a storefront list card draws ───────────────
+#
+# A SERP row shows one short line of attributes under the title — «2015 ·
+# 120 000 км» — and it reads it off the STORED card: a result page has no
+# category schema in hand and no budget for a hydration hop per row. Until
+# 0.10.9 the stored card carried title/price/currency/location/images/
+# published_at and nothing else, so that line was blank on every row of every
+# board while both halves of the answer already existed.
+
+
+def _publish_car(user, *, features: dict, defs: list[tuple[str, dict, dict]]):
+    """A published car listing in its own category, and its search document.
+
+    *defs* is ``[(slug, config, flags)]`` — the category's feature definitions,
+    authored in order. *features* is the draft's own values.
+    """
+    from decimal import Decimal
+
+    from stapel_categories.models import Category, CategoryFeature, Feature
+    from stapel_core.comm import call
+    from stapel_listings.models import Listing
+    from stapel_listings.services.publish import publish_listing
+
+    category = Category.objects.create(name="Cars", slug="cars-summary-line")
+    for order, (slug, config, flags) in enumerate(defs):
+        CategoryFeature.objects.create(
+            category=category,
+            feature=Feature.objects.create(
+                slug=slug, name=slug.title(), config=config, **flags
+            ),
+            order=order,
+        )
+    listing = Listing.objects.create(
+        owner=user,
+        category_id=str(category.pk),
+        language="en",
+        title_draft="A car",
+        description_draft="A perfectly ordinary car.",
+        price_draft=Decimal("100.00"),
+        lat_draft="49.6116",
+        lon_draft="6.1319",
+        features_draft=features,
+    )
+    publish_listing(listing)
+    listing.apply_moderation("approved")
+
+    key = str(listing.pk)
+    return key, call("listings.search_documents", {"keys": [key]})[key]
+
+
+def test_the_card_carries_a_spec_summary_line_for_a_listing_with_features(
+    db, user
+):
+    """Every element a card prints, with the OWNER's card contract on it.
+
+    `label` / `unit` / `presentation` are
+    `stapel_listings.services.features.decorate_card_elements` — called, never
+    reimplemented — so the line a search hit draws and the line the listing's
+    own API draws are one rule with one bug surface. `presentation` is what
+    stops a card from printing «Кирпичный · 3 · 9»: a bare numeric caption is
+    `name_value` («Year 2015») unless it has a unit, and then it is
+    `value_unit` («120000 км»).
+    """
+    from stapel_classified.search_sources import map_listing
+
+    key, payload = _publish_car(
+        user,
+        features={
+            "year": {"type": "int", "value": 2015},
+            "kilometrage": {"type": "int", "value": 120000},
+        },
+        defs=[
+            ("year", {"type": "int"}, {"show_at_title": True}),
+            (
+                "kilometrage",
+                {"type": "int", "postfix": "km"},
+                {"show_at_title": True},
+            ),
+        ],
+    )
+
+    line = map_listing({**payload, "key": key}).card["features_title"]
+
+    assert [element["slug"] for element in line] == ["year", "kilometrage"]
+    assert line[0]["label"] == "2015"
+    # No unit on the DAO, so the number needs its feature's name beside it or
+    # the card prints a bare «2015» nobody can read.
+    assert line[0]["presentation"] == "name_value"
+    assert line[0]["name"] == "Year"
+    assert "unit" not in line[0]
+    # A unit IS the caption's context, so the name is not repeated.
+    assert line[1]["label"] == "120000"
+    assert line[1]["unit"] == "km"
+    assert line[1]["presentation"] == "value_unit"
+
+
+def test_the_card_carries_badges_the_owner_serves(db, user):
+    """`features_badges` travels the same rule and the same call.
+
+    The mapper's contract is "whatever the owner serves plus `key`", so the
+    badge list is projected from the document exactly as the title line is —
+    one function over both, and the card badge contract on every element of
+    each. `show_as_badge` on a closed select is the case a card draws as a
+    chip rather than as part of the summary line.
+    """
+    from stapel_classified.search_sources import map_listing
+
+    key, payload = _publish_car(
+        user,
+        features={"condition": {"type": "select", "value": ["b-u"]}},
+        defs=[
+            (
+                "condition",
+                {
+                    "type": "select",
+                    "options": [
+                        {"value": "b-u", "label": "Used"},
+                        {"value": "new", "label": "New"},
+                    ],
+                },
+                {"show_as_badge": True},
+            )
+        ],
+    )
+    document = {**payload, "key": key}
+    # The owner stamps the badge column on the listing; a document that does
+    # not serve it yet projects an empty list rather than a wrong one.
+    from stapel_listings.models import Listing
+
+    document.setdefault("features_badges", Listing.objects.get(pk=key).features_badges)
+
+    (badge,) = map_listing(document).card["features_badges"]
+    assert badge["slug"] == "condition"
+    # The CAPTION, not the code. `b-u` on a chip is the storage slug printed
+    # at a buyer, which is the defect this contract exists to close.
+    assert badge["label"] == "Used"
+    assert badge["presentation"] == "value"
+
+
+def test_a_listing_without_features_projects_an_empty_line(published_listing):
+    """Both keys are always present, and empty is a sentence a card renders.
+
+    A missing KEY makes a client test for the field's existence; an empty
+    list says "this listing has nothing for that line", which is what the
+    card draws as no line at all.
+    """
+    card = _query()["items"][0]["card"]
+
+    assert card["features_title"] == []
+    assert card["features_badges"] == []

@@ -71,6 +71,44 @@ def _card_images(payload: dict) -> list:
     return list(dict.fromkeys(refs))[:limit]
 
 
+#: The two feature projections a card draws its summary line from.
+#:
+#: ``features_title`` is the attributes the category author flagged
+#: ``show_at_title``; ``features_badges`` is the ones flagged
+#: ``show_as_badge``. Both are DAO lists on the owner's document, and both are
+#: useless to a card on their own: a bare DAO left the storefront guessing and
+#: an apartment card read «Кирпичный · 3 · 9».
+CARD_FEATURE_KEYS = ("features_title", "features_badges")
+
+
+def card_features(payload: dict) -> dict:
+    """``{features_title, features_badges}`` with the card badge contract on.
+
+    The contract — ``label`` / ``unit`` / ``name`` / ``presentation``, with
+    ``presentation`` in ``value | value_unit | name_value | name`` and the unit
+    postfix rule that decides between them — is
+    :func:`stapel_listings.services.features.decorate_card_elements`, called
+    rather than reimplemented. It is derived wholly from the stored DAO, which
+    is why the owner applies it at the wire edge and why this composite can
+    apply the identical function to the identical DAOs and get the identical
+    line. A second copy here would be a second answer to «how is a card
+    written», and the day somebody fixes the unit rule in one of them the two
+    surfaces disagree.
+
+    Imported lazily and by module path, never re-exported: this is the owner's
+    rule, borrowed, and the import is the statement that it stays the owner's.
+
+    A key the document does not carry projects as ``[]`` — the same sentence
+    "this listing has nothing to say on that line" a listing with no features
+    makes, which is what a client renders as no line at all.
+    """
+    from stapel_listings.services.features import decorate_card_elements
+
+    return {
+        key: decorate_card_elements(payload.get(key) or []) for key in CARD_FEATURE_KEYS
+    }
+
+
 def _base_card(payload: dict) -> dict:
     """The fields every classified card shows, whatever renders it.
 
@@ -428,12 +466,14 @@ def _rating(user_id: str):
 
 
 __all__ = [
+    "CARD_FEATURE_KEYS",
     "IMAGE_KEYS",
     "META_OK",
     "META_PARTIAL",
     "STATE_AVAILABLE",
     "STATE_GONE",
     "STATE_UNAVAILABLE",
+    "card_features",
     "listing_cards",
     "seller_cards",
 ]

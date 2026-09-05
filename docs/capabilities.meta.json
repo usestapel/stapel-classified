@@ -100,6 +100,13 @@
     }
   ],
   "surface": {
+    "card_features": {
+      "kind": "factory",
+      "intent": "The card badge contract over a listing document's `features_title` / `features_badges` — the short spec line a result row prints under the title, with `label`, `unit` and a `presentation` telling the client which of the four ways to write the element.",
+      "instead_of": [
+        "deriving a caption and a unit from a stored attribute DAO yourself"
+      ]
+    },
     "chat_threads": {
       "kind": "factory",
       "intent": "Ask chat who is in these conversations and what each is about, batched — the read that makes a second copy of chat's membership unnecessary. Raises rather than answering empty when chat cannot be reached.",

@@ -1,8 +1,8 @@
-# stapel-classified 0.10.8
+# stapel-classified 0.10.9
 
 Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies, the marketplace reason taxonomy, and (since 0.3.2) the `listing` subject type stapel-chat's registry ships empty of. Its own HTTP surface is a conversation HEADER, assembled from three modules that may not know about each other: chat says who is in the thread and what it is about, listings answers the short card (title, price, the photo gallery with CDN render metadata, and a state that says `available`, `unavailable` or `gone` — exactly the answer a public read cannot give), profiles answers the counterparty. It owns NO table: the binding it kept from 0.2.0 to 0.3.1 existed only because chat could not tell two threads about two listings apart, and it was deleted rather than kept in sync the release chat could. It enforces no block of its own: stapel-chat 0.6.1 holds both write doors (opening a direct thread, sending into one) at the one point every client passes, and this composite's whole contribution is the value `required` it sets on chat's BLOCK_ENFORCEMENT axis in the preset. The pre-creation door it kept until 0.3.x was deleted in 0.4.0, and a deployment that still declares the old STAPEL_CLASSIFIED keys is told so at boot (E003) rather than silently inheriting chat's default.
 
-Contract: axes 3 · surface 7 · extension points 3 · operations 3 · error codes 46.
+Contract: axes 3 · surface 8 · extension points 3 · operations 3 · error codes 46.
 Generated from docs/capabilities.json by `stapel-llms-txt` — do not edit; drift-gated by `make contract-check`.
 
 ## Configuration axes — what a product switches on
@@ -21,6 +21,9 @@ This is the answer to "does Stapel already have something for X?". `instead of` 
   instead of: a second block check on a thread that already exists, storing a listing_id on your own chat model, trusting the client's word for what a thread is about
   The 'write to the seller' moment, verified: the listing exists, the caller is not its seller, and chat agrees the caller is in that thread and that it really is about that listing. Answers the header the client is about to render, and records nothing. It does NOT check for a block (0.4.0): the thread it is handed already exists, which is history, and stapel-chat refuses a blocked pair the thread at creation instead.
 ### factory
+- card_features — stapel_classified.cards.card_features
+  instead of: deriving a caption and a unit from a stored attribute DAO yourself
+  The card badge contract over a listing document's `features_title` / `features_badges` — the short spec line a result row prints under the title, with `label`, `unit` and a `presentation` telling the client which of the four ways to write the element.
 - chat_threads — stapel_classified.services.chat_threads
   instead of: importing stapel_chat models from a composite, keeping your own copy of a conversation's participants
   Ask chat who is in these conversations and what each is about, batched — the read that makes a second copy of chat's membership unnecessary. Raises rather than answering empty when chat cannot be reached.

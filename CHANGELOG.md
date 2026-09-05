@@ -1,5 +1,78 @@
 # Changelog
 
+## [0.10.9] — 2026-09-05
+
+The stored search card carries the spec summary line.
+
+A storefront's list card draws one short line of attributes under the title —
+«2015 · 120 000 км», «3 комн. · 9 этаж» — and it reads it off the card that
+travels with the search document, because a result page has no category
+schema in hand and no budget for a hydration hop per row. Until this release
+`search_sources._card` stored `title`, `price`, `currency`, `location_label`,
+`images`, `image` and `published_at` and nothing else, so the client's
+fallback to `features_title` found no such key and every row of every board
+drew a blank line. Both halves of the answer already existed on either side
+of the seam and nothing joined them, which is what a composite is for.
+
+`cards.card_features(payload)` now projects `features_title` and
+`features_badges` onto the stored card with the OWNER's card badge contract on
+every element: `label`, `unit`, `name`, and `presentation` in
+`value | value_unit | name_value | name`. The rule is
+`stapel_listings.services.features.decorate_card_elements` — **called, not
+reimplemented**. A second copy of "how a card writes a value and its unit"
+here is the day somebody fixes the unit rule in one of the two and a SERP row
+and the listing page start printing different lines for one stored DAO. So a
+bare numeric caption with no unit is `name_value` («Year 2015») and one with a
+unit is `value_unit` («120000 km»); a false boolean is absent from the list
+entirely; a header, a redacted stub and a blank value render to nothing and
+are dropped. None of that is decided in this repo.
+
+Borrowing a function means declaring it: the `stapel-listings` floor moves to
+`>=0.21.3` (the release that added the contract), and `stapel-shop`'s to
+`>=0.2.30` — shop capped `stapel-listings<0.21` through 0.2.29, so held below
+it the two lines have no common solution and `pip install` answers
+ResolutionImpossible pointing at listings, which is not where the wall is.
+The eighth time this file has named the sibling-cap wall. Caps are unchanged.
+
+The two lists live BESIDE `cards._base_card` rather than inside it. A chat
+header is a header: it does not draw a spec line, and `ListingCardDTO` is this
+module's published contract for it. Growing a stored search document is
+additive; growing the chat card is an API change, and the two are not one
+decision.
+
+### Reindex — the stored cards change, so the fleet has to re-project
+
+A card is stored WITH the document, so this release changes nothing for
+listings already in the index until they are re-indexed. Run the search
+library's rebuild for the `listing` source, in the deployment that mounts this
+preset:
+
+```
+python manage.py search_rebuild --type listing
+```
+
+It walks `listings.search_export` (the cursor snapshot, the same builder the
+live pull answers from), so a rebuilt index and a live-updated one cannot
+disagree about what a listing looks like. `--batch-size` defaults to 500; add
+`--apply-settings` only if engine settings changed too, which they did not
+here. A listing edited after the deploy re-projects on its own `listing.*`
+signal; the rebuild is what fixes the corpus that is sitting still.
+
+Verify with `python manage.py search_drift_check --type listing` afterwards.
+
+### Known gap, and it is upstream
+
+`features_badges` is projected from whatever `listings.search_documents`
+serves, and as of stapel-listings 0.21.5 that document builder
+(`services/search_feed.py::build_search_document`) serves `features_title` and
+**not** `features_badges` — the column exists on the model and the listing's
+own API serializes it, but it is not in the search document. So on today's
+fleet the key is present and empty on every card, and it fills the moment
+listings adds one line to that builder. Inventing a second read path here
+would be the "declared but not connected" defect in the seam that exists to
+prevent it (see `search_sources`'s module docstring on the DAO path), so the
+ask is routed rather than worked around.
+
 ## [0.10.8] — 2026-09-05
 
 The composite now names the listing owner for reviews: a new

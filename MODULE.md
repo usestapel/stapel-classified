@@ -72,6 +72,16 @@ that and neither can a catalogue.
   `profiles.public_cards`, `reviews.aggregate`). Its `_base_card` is what
   `search_sources._card` also uses — one definition of "the card", so a
   search hit and a chat header cannot disagree.
+- **`cards.card_features` is the SPEC SUMMARY LINE** (0.10.9), and it is the
+  owner's rule borrowed rather than copied: `features_title` /
+  `features_badges` go through
+  `stapel_listings.services.features.decorate_card_elements`, which stamps
+  `label`, `unit`, `name` and `presentation`
+  (`value | value_unit | name_value | name`) on every element. A card that has
+  only the stored DAO prints «Кирпичный · 3 · 9»; the contract is what makes
+  «Этаж 3» and «42 м²» decidable server-side, with no category schema at the
+  client. It rides on the SEARCH card only — a chat header draws no spec line,
+  and `ListingCardDTO` is this module's published contract for that header.
 - **`state`: `available` / `unavailable` / `gone`.** The public listing read
   404s everything not published; that is right for a stranger and useless for
   the person in the conversation about it, which is exactly when a buyer is
@@ -253,6 +263,14 @@ Two properties worth knowing before you extend it:
   listing attributes do not work and `hex_color`'s `simple` axis and unit
   context are gone. Closing it is one field in listings' document builder plus
   dropping `features_search=` for `features=` here.
+- **`features_badges` is projected but not yet SERVED** (0.10.9). The stored
+  card carries both feature lists through the same contract, and
+  `build_search_document` in stapel-listings 0.21.5 serves `features_title`
+  and not `features_badges` — the column exists on the model and the listing's
+  own API serializes it. So the key is present and empty on today's fleet and
+  fills with one line upstream. Reading the column by a second path from here
+  would be the "declared but not connected" defect above, spelled a different
+  way.
 - **A vocabulary-backed title chip is a LABEL, and only that one field is
   read off a DAO** (0.5.0). `features_title` *is* served and it is a DAO list
   by contract, so `_title_text` takes `labels` for `ref_select` /
