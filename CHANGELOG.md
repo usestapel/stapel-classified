@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.7] — 2026-09-05
+
+Patch. Cap only: `stapel-search` admits 0.15, `stapel-reviews` admits 0.6.
+(`stapel-shop`'s existing `<0.3` range already admits 0.2.33.)
+
+stapel-search 0.15.0 adds a denormalised `owner_key` to a search hit. This
+module already writes that column on every `ClassifiedListingDocument` it
+hands to search — `search_sources.py` sets
+`owner_key=str(payload.get("owner_id") or "")` on indexing — so 0.15.0 only
+means the field now rides back on the hit unchanged; nothing in this preset
+reads it. The cap was the only wall.
+
+stapel-reviews 0.6.0 adds an optional denormalised `owner_key` column on
+reviews, a new per-owner batch aggregate Function/endpoint, and a backfill
+command for the column. This module calls only the existing single-key
+`reviews.aggregate` Function (`cards.py:_rating`, one call per seller
+`user_id`) for the `{avg, count}` a seller card publishes; it never reaches
+the new batch Function or the `owner_key` column. The cap was the only wall.
+
 ## [0.10.6] — 2026-09-04
 
 Patch. Cap only: `stapel-categories` admits 0.20.
