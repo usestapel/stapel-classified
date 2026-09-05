@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.9"
+version = "0.10.10"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -459,7 +459,18 @@ dependencies = [
     # here is the day the two surfaces start printing different lines for one
     # stored DAO — and a borrowed function has to be declared, or the import
     # is an AttributeError at the first SERP on an older listings.
-    "stapel-listings>=0.21.3,<0.22",
+    # >=0.21.6 as of composite 0.10.10: 0.21.3 gave this module the RULE
+    # (`decorate_card_elements`) but not the DATA it decorates — the search
+    # document `search_sources.py` reads never carried `features_badges` at
+    # all, so `cards.card_features`'s `payload.get("features_badges") or []`
+    # was an empty list for every listing, badge-flagged feature or not. This
+    # composite's own `test_the_card_carries_badges_the_owner_serves` worked
+    # around exactly that gap by stapling the model column onto the document
+    # by hand before asserting on it. 0.21.6 is where the document itself
+    # serves the column next to `features_title`; the floor moves so a fresh
+    # install gets the badge on the card the way that test now proves in
+    # production too, not only under its own patch.
+    "stapel-listings>=0.21.6,<0.22",
     # <0.5, not <0.4: the picker's server half is 0.4.0 (GET /geo/api/v1/map/config
     # and geocoding/resolve). Held at <0.4 this composite pins a fleet to a geo that
     # cannot serve a map, so a listing composer has no choice but to ask a human for
@@ -537,7 +548,15 @@ dependencies = [
     # sets `owner_key=str(payload.get("owner_id") or "")` on indexing) — the
     # release only means search now carries the field back on the hit, which
     # nothing in this preset reads. The cap was the only wall.
-    "stapel-search>=0.11.1,<0.16",
+    # <0.17, not <0.16: stapel-search 0.16.0 adds `label` / `label_translatable`
+    # / `unit` / `order` to every numeric axis of `facet_meta.ranges`, so a
+    # host with no category schema in hand can still print a heading instead
+    # of the storage slug over a price/year/mileage range. This composite
+    # writes documents and registers itself as a source (`search_sources.py`
+    # / `preset.py`); it renders no facet panel of its own and reads no key
+    # of `facet_meta` at all, so the changed surface is invisible here. The
+    # cap was the only wall.
+    "stapel-search>=0.11.1,<0.17",
     # >=0.4, not >=0.3: 0.4.0 is where stapel_moderation subscribes
     # 'user.merged' — a merge re-parents the reports and decisions an account
     # holds, and an app that only knows 'user.deleted' strands them. Under

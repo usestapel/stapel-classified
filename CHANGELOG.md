@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.10.10] — 2026-09-05
+
+Cap-only. Two dependency lines move; nothing in this composite changes.
+
+`stapel-search` widens from `<0.16` to `<0.17`. 0.16.0 adds `label` /
+`label_translatable` / `unit` / `order` to every numeric axis of
+`facet_meta.ranges`, so a host with no category schema in hand can print a
+heading over a price/year/mileage range instead of the storage slug. This
+composite writes documents and registers itself as a search source
+(`search_sources.py` / `preset.py`); it renders no facet panel of its own and
+reads no key of `facet_meta`, so the changed surface is invisible here — the
+cap was the only wall.
+
+`stapel-listings` floor rises from `>=0.21.3` to `>=0.21.6`. 0.21.3 gave this
+composite the RULE (`cards.card_features` imports
+`stapel_listings.services.features.decorate_card_elements`, the owner's card
+badge contract) but not the DATA it decorates: the search document built by
+`services.search_feed.build_search_document` never carried `features_badges`,
+so `payload.get("features_badges") or []` was always `[]` regardless of
+whether the listing had a badge-flagged feature. `test_the_card_carries_
+badges_the_owner_serves` in this repo worked around exactly that gap by
+stapling the model column onto the document by hand before asserting on it.
+0.21.6 is where the document itself serves the column next to
+`features_title`; the floor moves so a fresh install gets the badge on the
+card in production, not only under that test's workaround.
+
 ## [0.10.9] — 2026-09-05
 
 The stored search card carries the spec summary line.
