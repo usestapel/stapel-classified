@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.11"
+version = "0.10.12"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -620,7 +620,14 @@ dependencies = [
     # suite MOUNTS chat, so a floor of 0.6.1 lets a runner install a chat that
     # trips stapel_core.lifecycle.E001 — and a deployment on 0.6.1 loses a
     # signed-in visitor's whole conversation to the CASCADE.
-    "stapel-chat>=0.6.3,<0.8",
+    # <0.9, not <0.8: 0.8.0 moves presence from session to account
+    # (`is_authenticated` -> "does a real account sit behind this session"),
+    # and 0.8.1 adds the comm Function `chat.post_system_message` for a
+    # sibling to record something that happened outside chat. This composite
+    # calls neither presence internals nor the new Function — it mounts chat
+    # and reads none of chat's own surface directly — so the cap was the only
+    # wall between this fleet and the sibling running svc-chat 0.8.1 already.
+    "stapel-chat>=0.6.3,<0.9",
 ]
 
 # The block harness this module ships (stapel_classified/testing.py). A

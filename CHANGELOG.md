@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.10.12] — 2026-09-06
+
+Cap-only. One dependency line moves; nothing in this composite changes.
+
+`stapel-chat` widens from `<0.8` to `<0.9`. 0.8.0 moves presence from the
+session to the account — a guest's browser tab used to inherit a stranger's
+`last_seen_at`/`online_until` purely by carrying `IsAuthenticated`, and 0.8.0
+asks the sharper question of whether a real person's account sits behind the
+session before it says so. 0.8.1 adds the comm Function
+`chat.post_system_message`, a narrow write path (`sender=None`, `kind=system`
+hard-coded, `additionalProperties: false`) for a sibling service to record
+something that happened outside chat — a call, a booking, a shipment — as a
+line in the thread. This composite calls neither: it mounts `stapel_chat` and
+reads its own surface (`services.py`, `blocks`, `conf`), never chat's
+presence internals or the new Function, so both changes are invisible here.
+
+The cap was live, not academic: svc-classified-core vendors stapel-chat
+in-process, svc-chat is already running 0.8.1, and the `<0.8` ceiling meant
+the two services in the same fleet were on different majors of a shared
+dependency the moment svc-chat published. Widening the cap ends that skew;
+nothing here starts calling `post_system_message`.
+
 ## [0.10.11] — 2026-09-05
 
 Cap-only. Two dependency lines move; nothing in this composite changes.
