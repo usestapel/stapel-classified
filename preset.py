@@ -11,6 +11,8 @@ same wiring from the STAPEL_LIBS registry; this module is the single source
 a hand-written settings.py/urls.py copies from instead.
 """
 
+from .reviews import listing_owner_key
+
 # Dotted app paths, in mount order. L1 libraries (stapel-attributes) are pip
 # dependencies, NOT Django apps — deliberately absent here.
 #
@@ -101,6 +103,13 @@ SETTINGS_DEFAULTS = {
                 # Host policy callbacks (comm Functions) are None by default:
                 # any authenticated user may review. Register and name your
                 # own "can_review"/"can_moderate" Functions to restrict.
+                # Who owns a `listing` target — the callable form
+                # (registry.resolve_owner_key), one call to
+                # `listings.status`. Names the listing's owner so
+                # stapel-reviews' per-owner batch aggregate (0.6.0) works out
+                # of the box on this scenario's own target type; a
+                # deployment on an older reviews just gets an inert key.
+                "owner_key_for": listing_owner_key,
             },
         },
     },

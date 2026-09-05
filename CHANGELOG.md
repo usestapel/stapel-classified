@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.10.8] — 2026-09-05
+
+The composite now names the listing owner for reviews: a new
+`stapel_classified.reviews.listing_owner_key(target_key)` resolves a
+stringified listing pk to its owner via `listings.status`, returning `None`
+(never raising) for a non-integer key or an unknown listing. `preset.py`
+registers it as `STAPEL_REVIEWS["TARGET_TYPES"]["listing"]["owner_key_for"]`,
+the resolver stapel-reviews 0.6.0 introduced — so every fleet mounting this
+scenario gets a working per-owner rating out of the box (after running
+`manage.py reviews_backfill_owner_keys` once, for reviews written before the
+resolver existed), instead of leaving the seam to a deployment's own glue.
+
+This makes `owner_key_for` a real dependency rather than an inert key, so the
+`stapel-reviews` floor moves to `>=0.6` (from `>=0.5`): older reviews ignores
+the extra policy key silently — the resolver is simply never called — and
+the floor turns that into a loud `ResolutionImpossible` at install instead.
+Cap stays `<0.7`.
+
 ## [0.10.7] — 2026-09-05
 
 Patch. Cap only: `stapel-search` admits 0.15, `stapel-reviews` admits 0.6.

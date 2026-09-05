@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.7"
+version = "0.10.8"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -162,14 +162,21 @@ dependencies = [
     # 0.5.1..0.5.3 of THIS package died of, three publish runs in a row: the
     # composite mounts reviews, so the composite is where the silence is
     # reported. The cap moves with the floor by the house pre-1.0 rule.
-    # <0.7, not <0.6: stapel-reviews 0.6.0 adds an optional denormalised
-    # `owner_key` column on reviews, a new per-owner batch aggregate
-    # Function/endpoint, and a backfill command for the column. This module
-    # calls only the existing single-key `reviews.aggregate` Function
-    # (`cards.py:_rating`, one call per seller `user_id`) for the
-    # `{avg, count}` a seller card publishes — it never reaches the new
-    # batch Function or the `owner_key` column. The cap was the only wall.
-    "stapel-reviews>=0.5,<0.7",
+    # <0.7, not <0.6 (composite 0.10.7): stapel-reviews 0.6.0 adds an
+    # optional denormalised `owner_key` column on reviews, a new per-owner
+    # batch aggregate Function/endpoint, and a backfill command for the
+    # column. At 0.10.7 this module called only the existing single-key
+    # `reviews.aggregate` Function (`cards.py:_rating`) — the cap was the
+    # only wall.
+    # >=0.6, not >=0.5 (composite 0.10.8): this release REGISTERS the new
+    # resolver — `STAPEL_REVIEWS["TARGET_TYPES"]["listing"]["owner_key_for"]`
+    # in preset.py, backed by `stapel_classified.reviews.listing_owner_key`
+    # — so the composite now depends on a mechanism (`registry.py`'s
+    # `owner_key_for` policy key, `reviews.aggregates_by_owner_keys`) that
+    # does not exist before 0.6.0. An older reviews would not error on the
+    # extra policy key, it would just silently never call the resolver —
+    # the floor makes that fail loudly, at install, instead.
+    "stapel-reviews>=0.6,<0.7",
     # >=0.2.8, not >=0.2.6: 0.2.8 is the release whose own
     # `stapel-categories` cap admits 0.8. Held at 0.2.6 a resolver can pick a
     # shop that caps `stapel-categories<0.8` and the line below has no
