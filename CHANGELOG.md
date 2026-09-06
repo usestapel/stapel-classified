@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.15] — 2026-09-06
+
+Floor-only. `stapel-core` rises from `>=0.45` to `>=0.60.6`: the test
+fixtures wire up `ApiErrorPagesMiddleware`
+(`stapel_core.django.api.error_pages`, added in core 0.60.4), which
+rewrites an unknown-path 404/405 into the fleet's JSON error envelope
+instead of Django's HTML page. The floor was stating a version where that
+middleware does not exist; 0.60.6 is the current patch on that line.
+
 ## [0.10.14] — 2026-09-06
 
 Cap-only. `stapel-moderation` widens from `<0.7` to `<0.8`; nothing this

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.14"
+version = "0.10.15"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -116,7 +116,12 @@ classifiers = [
 # stapel-vocabularies >=0.1,<0.2 — the new member. Its floor is its first
 # release; the cap is the house pre-1.0 rule (minor = breaking).
 dependencies = [
-    "stapel-core>=0.45,<1.0",
+    "stapel-core>=0.60.6,<1.0",
+    # 0.60.6 is the floor because conftest.py wires up
+    # `ApiErrorPagesMiddleware` (stapel_core.django.api.error_pages, added
+    # 0.60.4), which turns an unknown-path 404/405 into the fleet's JSON
+    # envelope instead of Django's HTML page — 0.60.6 is simply the current
+    # patch on that line.
     # <0.7 with the floor at 0.6: stapel-attributes 0.6.0 adds the composite
     # `group` kind — one feature holding a list of ROWS of child feature
     # definitions. It is not a nicety for an imported marketplace catalogue:
