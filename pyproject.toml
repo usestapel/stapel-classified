@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.13"
+version = "0.10.14"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -608,7 +608,29 @@ dependencies = [
     # from reporting as a full screening. This composite registers `listing`
     # with `media: True`, so it is the registration that makes that path
     # live here.
-    "stapel-moderation>=0.4,<0.7",
+    #
+    # <0.8, not <0.7: 0.7.0 splits the one state `needs_review` used to carry
+    # for both "a person must decide" and "the screening seam itself is
+    # broken" into `CaseState.QUEUED` (unchanged) and a new `CaseState.DLQ`
+    # (a screening failure, no verdict, `dlq_at`/`last_error_class`, off the
+    # human queue), adds `target_is_addressable`/`dead_letter_case`/
+    # `close_subject_gone`, the `subject_gone`/`screening_failed` SYSTEM
+    # reason codes, `moderation_screen_failed_total` /
+    # `moderation_case_dlq_total` metrics, `GET cases?state=dlq`,
+    # `stats.queue_total`/`dlq_total`, and `POST cases/<id>/rescan`. This
+    # composite reads only `resolve_policy`'s per-target dict (gate,
+    # content_function, id_field, verdict_event, reasons, media — unchanged
+    # shape), `register_target_type` via `preset.TARGET_TYPES`, and
+    # `get_reasons`/`reasons_for_target` (`reasons_for_target` already
+    # excludes every `system` reason, so the two new ones join
+    # `screening_unavailable` invisibly). It calls no case-listing, admin
+    # or queue-count endpoint of its own and enumerates no state — `dlq`
+    # lands with nothing here to update. A pre-gate target (`listing`) that
+    # used to get a spurious `policy_default/needs_review` verdict on a
+    # screening failure now gets none at all; either way the listing was
+    # never `published`, so the composite's own read of `Listing.status`
+    # sees the same "not yet decided" either side of this release.
+    "stapel-moderation>=0.4,<0.8",
     # >=0.6.1 is LOAD-BEARING, not hygiene: 0.6.1 is where chat began
     # refusing a blocked pair the THREAD at create_direct, and 0.4.0
     # deleted this package's own pre-creation door on that promise.

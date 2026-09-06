@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.10.14] — 2026-09-06
+
+Cap-only. `stapel-moderation` widens from `<0.7` to `<0.8`; nothing this
+composite serves changes.
+
+0.7.0 splits what `needs_review` used to mean two things at once. A
+screening failure — the LLM proxy down, `fetch_content` unreachable — used
+to be written down as a `policy_default / needs_review` verdict and land in
+the human queue, indistinguishable from a screener that had genuinely
+abstained; a client stand carried 567 such verdicts, not one of which was a
+judgement, and 122 queued cases no moderator could act on. 0.7.0 gives a
+screening failure its own state, `CaseState.DLQ` — out of the human queue,
+carrying `dlq_at`/`last_error_class`, holding no verdict at all — and adds
+`target_is_addressable`/`dead_letter_case`/`close_subject_gone`, the
+`subject_gone`/`screening_failed` system reason codes,
+`moderation_screen_failed_total`/`moderation_case_dlq_total` metrics,
+`GET cases?state=dlq`, `stats.queue_total`/`dlq_total`, and
+`POST cases/<id>/rescan`. `GET cases` with no `state` filter now includes
+`dlq` rows alongside every other open state.
+
+This package reads only `resolve_policy()`'s per-target dict (`gate`,
+`content_function`, `id_field`, `verdict_event`, `reasons`, `media` — same
+shape in 0.7.0 as in 0.6.x), registers its four target types through
+`register_target_type()` via `preset.TARGET_TYPES`, and merges its own
+reason taxonomy in through `get_reasons()`/`reasons_for_target()`. It holds
+no queue view, no admin case listing, no state enum, and no `GET cases`
+call of its own — `reasons_for_target()` already drops every `system`
+reason before a reporter sees the list, so the two new ones join
+`screening_unavailable` invisibly, and `dlq` lands with nothing here that
+enumerates open states to update. The listing target (`gate: "pre"`) is the
+one place the *behavior* actually changed upstream — a screening failure no
+longer manufactures a verdict — but a `Listing` was never `published` on
+either side of that: `moderation_status` just stayed `pending` on a fake
+verdict before, and stays `pending` on no verdict now, so
+`tests/test_moderation_targets.py` sees the same thing it always did.
+
+Verified against the published `stapel-moderation==0.7.0`, not the sibling
+worktree.
+
 ## [0.10.13] — 2026-09-06
 
 Cap-only for the composite's own dependency line; the rest of this release is
