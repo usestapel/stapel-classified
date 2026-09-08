@@ -557,6 +557,29 @@ def test_the_api_refuses_an_anonymous_caller(published_listing, client_for):
     assert response.status_code in (401, 403)
 
 
+def test_the_anonymous_refusal_is_the_fleet_envelope(published_listing, client_for):
+    """The refusal body, not only its status code.
+
+    The 404 two tests down already asserts ``localizable_error`` — but that
+    one is built by view code, so it reads the same whether or not DRF's
+    handler is core's. This one is not: the permission layer raises it, and
+    the only seam that dresses it is ``REST_FRAMEWORK["EXCEPTION_HANDLER"]``.
+    Until this harness carried that key it answered DRF's bare
+    ``{"detail": "..."}``, which is precisely the gap
+    ``stapel_core.error_envelope.W001`` reports — one status coming back in
+    two shapes depending on which layer said no.
+    """
+    response = client_for().post(
+        "/classified/api/v1/conversations",
+        {"conversation_id": str(_conv()), "listing_id": str(published_listing.pk)},
+        format="json",
+    )
+    assert response.status_code in (401, 403), response.content
+    assert "localizable_error" in response.data, response.data
+    assert response.data["localizable_error"].startswith("error."), response.data
+    assert set(response.data) >= {"localizable_error", "error", "params"}, response.data
+
+
 def test_a_stranger_gets_the_same_404_as_a_nonexistent_thread(
     published_listing, other_user, user, thread, client_for, db
 ):

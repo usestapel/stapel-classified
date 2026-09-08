@@ -20,6 +20,7 @@ def pytest_configure(config):
     # imported, to dodge the import-time settings read"). This is the half of
     # that helper a harness with no static/ directory of its own needs.
     from stapel_core.staticfiles import embedded_static_dirs
+    from stapel_core.testing import BASE_REST_FRAMEWORK
 
     if not settings.configured:
         # stapel_geo is deliberately NOT installed here: its models need
@@ -233,6 +234,22 @@ def pytest_configure(config):
                 {"name": "classified", "prefix": ""},
                 {"name": "auth", "prefix": "auth/"},
             ],
+            # The other half of the ApiErrorPagesMiddleware note above, and
+            # the same symptom from the other side: that middleware keeps an
+            # unknown path off Django's HTML page, this keeps a REFUSAL off
+            # DRF's bare {"detail": ...}. A harness that writes its own
+            # settings and omits the key gets DRF's default handler, so 401
+            # and 403 from authenticators and permission classes, 404 from
+            # get_object_or_404, 405/406/415 from dispatch and 429 from a
+            # throttle answer outside the fleet envelope
+            # (stapel_core.error_envelope.W001) — and a "realistic host"
+            # harness that answers refusals unrealistically is exactly what
+            # this file's own rule forbids. Only this one key: the rest of
+            # DRF's defaults stay as the suite had them. Read off core's own
+            # test preset, never re-typed here.
+            REST_FRAMEWORK={
+                "EXCEPTION_HANDLER": BASE_REST_FRAMEWORK["EXCEPTION_HANDLER"],
+            },
         )
         import django
 
