@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.15"
+version = "0.10.16"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -635,7 +635,29 @@ dependencies = [
     # screening failure now gets none at all; either way the listing was
     # never `published`, so the composite's own read of `Listing.status`
     # sees the same "not yet decided" either side of this release.
-    "stapel-moderation>=0.4,<0.8",
+    #
+    # <0.9, not <0.8: 0.8.0 finishes what 0.7.0 started. A case that declares
+    # photos and resolves none of them used to get a `policy_default /
+    # needs_review / media_unavailable` verdict and join the human queue; it
+    # is now parked with no verdict at all, under `ON_MEDIA_UNAVAILABLE`
+    # ("dlq", the default, or "review"). This composite registers `listing`
+    # with `media: True`, so that is the registration that makes the path
+    # live here — and the argument is the one 0.10.14 made for the
+    # screening-failure half: either side of the release the listing was
+    # never `published`, so this composite's own read of `Listing.status`
+    # sees the same "not yet decided". The composite states no verdict and
+    # enumerates no case state.
+    #
+    # 0.8.0 also adds `tasks.sweep_orphaned_cases` (a case whose target was
+    # deleted is closed as `dismissed / subject_gone` rather than sitting in
+    # the queue forever) and `services.park_unscreened`. Both are additive,
+    # and the beat entry arrives through `get_moderation_beat_schedule()`,
+    # which a host already calls — nothing here names the jobs one by one.
+    # `screen_case`'s "target gone" branch stops writing the unregistered
+    # reason code `target_not_found` and writes `subject_gone`, which
+    # `reasons_for_target` has always excluded as a system reason, so the
+    # composite's reason lists are byte-identical.
+    "stapel-moderation>=0.4,<0.9",
     # >=0.6.1 is LOAD-BEARING, not hygiene: 0.6.1 is where chat began
     # refusing a blocked pair the THREAD at create_direct, and 0.4.0
     # deleted this package's own pre-creation door on that promise.

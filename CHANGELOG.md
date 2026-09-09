@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.10.16] — 2026-09-09
+
+Cap-only. `stapel-moderation` widens from `<0.8` to `<0.9`; nothing this
+composite serves changes.
+
+0.8.0 finishes what 0.7.0 started. 0.7.0 stopped a screening FAILURE from
+being written down as a verdict; the other half — a case that declares photos
+and resolves not one of them — kept minting `policy_default / needs_review /
+media_unavailable` and joining the human queue. On a client stand that was
+201 verdicts, 46 of them the entire content of the moderator queue, none of
+them a judgement. Such a case is now parked with no verdict at all, under a
+new `ON_MEDIA_UNAVAILABLE` axis (`"dlq"`, the default, or `"review"` — which
+leaves it queued and marked unscreenable and prints `moderation.W010`).
+
+This composite registers `listing` with `media: True`, so that registration
+is what makes the path live here — and the argument is 0.10.14's: either side
+of the release the listing was never `published`, so this composite's own
+read of `Listing.status` sees the same "not yet decided". It states no verdict
+and enumerates no case state.
+
+0.8.0 also adds `tasks.sweep_orphaned_cases`, which asks a target module
+whether a case's subject still exists and closes the ones that no longer do
+as `dismissed / subject_gone` — the mechanism that keeps a moderator queue
+from filling with cases about deleted listings — and `services.park_unscreened`.
+Both are additive, and the beat entry arrives through
+`get_moderation_beat_schedule()`, which a host already calls. `screen_case`'s
+"target gone" branch stops writing the unregistered reason code
+`target_not_found` and writes `subject_gone`; `reasons_for_target` has always
+excluded system reasons, so this composite's reason lists are byte-identical.
+
 ## [0.10.15] — 2026-09-06
 
 Floor-only. `stapel-core` rises from `>=0.45` to `>=0.60.6`: the test
