@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.18] — 2026-09-10
+
+cap-only: stapel-vocabularies `<0.3` → `<0.4` (0.3.0 adds `OrmResolver.terms()`
+/ `CommResolver.terms()` and the `vocabularies.terms` Function — the level a
+category's `children_expand_by` draws a `ref_select` branch from; `describe` /
+`exists` / `is_child` / `labels` are unchanged and this composite calls none of
+them directly). The cap was the only wall: it broke a fleet image build on
+`ResolutionImpossible` tonight.
+
 ## [0.10.17] — 2026-09-10
 
 cap-only: stapel-categories <0.23 (0.22.0 adds `children_axis_tag`,

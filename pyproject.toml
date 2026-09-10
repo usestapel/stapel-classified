@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.17"
+version = "0.10.18"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -375,7 +375,15 @@ dependencies = [
     # dictionary that can only be alphabetical and to a matcher no caller
     # can threshold, which is the fifth time in this file a sibling's cap,
     # not an incompatibility, was the wall.
-    "stapel-vocabularies>=0.1.4,<0.3",
+    # <0.4, not <0.3: cap-only. stapel-vocabularies 0.3.0 adds
+    # `OrmResolver.terms()` / `CommResolver.terms()` and a `vocabularies.terms`
+    # Function — the level reader stapel-categories 0.22's `children_expand_by`
+    # draws a `ref_select` branch from. `describe` / `exists` / `is_child` /
+    # `labels` keep their signatures; this composite calls none of them
+    # directly anyway (it installs the app, mounts `vocabularies/`, and asserts
+    # the ORM resolver is registered). The cap was the only wall, and it was
+    # the wall that broke a fleet image build tonight.
+    "stapel-vocabularies>=0.1.4,<0.4",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
     # a deployment able to resolve back onto a listings without the behaviour
