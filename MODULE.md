@@ -46,6 +46,34 @@ So this package flips `http=True` in the STAPEL_LIBS registry (a change routed
 to stapel-tools), mounts `classified/api/`, owns **no models at all**, and
 emits its own contract triad. The members keep every seam they had.
 
+## Sibling ranges: a floor and `<1.0`
+
+Architect's ruling, 2026-09-11. A **composite** library depends on its
+`stapel-*` siblings with a floor and `<1.0` only — never a cap at the next
+minor. The house pre-1.0 rule (minor = breaking) is unchanged for **leaf**
+libraries, which is where a cap buys something: a leaf caps a dependency whose
+surface it actually calls, so a minor there is a real finding. A composite
+calls nothing that moves; it fixes a combination. Capping eleven siblings at
+their next minor therefore bought no safety and guaranteed one failure —
+this package expires the moment any single member ships a minor, and until it
+is re-released nobody can build an image at all. That is not theory: 0.10.17,
+0.10.18 and 0.10.19, and stapel-shop 0.2.33 through 0.2.35, are cap-only
+releases, and on 2026-09-11 the fleet answered `ResolutionImpossible` three
+times in one day (categories 0.22, vocabularies 0.3 then 0.4, reviews 0.7).
+The upper bound is now silent and two gates speak instead: (a) this repo's CI
+runs a `newest-siblings` matrix leg that takes no pip cache, upgrades every
+`stapel-*` requirement to the newest release inside the declared range in one
+joint `pip install -U`, and runs the whole suite against that — so a sibling
+minor that genuinely breaks this composite turns red the day it is published;
+and (b) the fleet's joint-resolution gate runs before any image build, so a
+combination that cannot resolve is caught there rather than in production.
+`tests/test_sibling_ranges.py` pins the policy itself: reinstate a tighter cap
+on any `stapel-*` requirement, runtime or extra, and CI fails with that
+sentence. The **floor** keeps carrying the argument — it says which sibling
+release first held the surface this composite mounts, and the comments beside
+each line in `pyproject.toml` are the case for it. Raising a floor is still an
+ordinary, expected change; lowering the ceiling is not.
+
 ## The conversation header
 
 The product finding: a chat opened in the live classified product was

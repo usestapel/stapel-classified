@@ -67,3 +67,49 @@ jobs:
         continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  newest-siblings:
+    # Half (a) of the sibling-range ruling (2026-09-11, MODULE.md §"Sibling
+    # ranges"; tests/test_sibling_ranges.py holds the other end of it).
+    #
+    # This composite no longer caps a sibling at the next minor, so metadata
+    # cannot be the thing that says "0.22 of stapel-categories is fine here".
+    # This leg says it instead: it ignores every cache and every wheel this
+    # runner might already hold, upgrades every stapel-* requirement to the
+    # newest release inside the DECLARED range, prints what it got, and runs
+    # the whole suite against that. A sibling minor that actually breaks this
+    # composite turns red here, on the day it is published, instead of turning
+    # into a `ResolutionImpossible` in a fleet image build weeks later.
+    #
+    # The upgrade is ONE pip call on purpose: pip then resolves the siblings
+    # jointly, which is the same question the fleet's pre-build gate asks.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          # No `cache: pip` — a cached wheel is the lock this leg exists to ignore.
+
+      - name: Install (editable, with the test extra)
+        run: pip install -e ".[test]" --no-cache-dir
+
+      - name: Upgrade every stapel-* sibling to the newest inside the declared range
+        run: |
+          python -c 'import tomllib; p = tomllib.load(open("pyproject.toml", "rb"))["project"]; groups = [p.get("dependencies") or []] + list((p.get("optional-dependencies") or {}).values()); print("\n".join(s for g in groups for s in g if s.lower().startswith("stapel-")))' > /tmp/sibling-specs.txt
+          cat /tmp/sibling-specs.txt
+          mapfile -t SPECS < /tmp/sibling-specs.txt
+          pip install -U --no-cache-dir "${SPECS[@]}"
+
+      - name: What actually got installed
+        run: pip list --format=freeze | grep -i '^stapel-'
+
+      - name: Tests against the newest siblings
+        env:
+          STAPEL_TEST_STRICT_SIBLINGS: "1"
+        run: pytest tests/ -q

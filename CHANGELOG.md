@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.10.20] — 2026-09-11
+
+Patch. Every `stapel-*` sibling range widens to `>=<floor>,<1.0` — all eleven
+members plus the three in the `test` extra. The floors and the long comments
+arguing for each of them are untouched, and no behaviour moves.
+
+Architect's ruling, 2026-09-11: a COMPOSITE library depends on its siblings
+with a floor and `<1.0` only — compatibility with a new sibling minor is
+proven by the composite's own CI installing the newest sibling within range,
+and by the fleet's joint-resolution gate before any image build, not by a cap.
+
+The house pre-1.0 rule (minor = breaking) still governs LEAF libraries, which
+is where a cap buys something: a leaf caps a dependency it actually calls.
+A composite calls nothing that moves — it fixes a combination — so capping
+eleven siblings at the next minor only guaranteed that this package expired
+the moment any one of them shipped a minor. It did: 0.10.17, 0.10.18, 0.10.19
+and stapel-shop 0.2.33-0.2.35 are all cap-only releases, and on 2026-09-11
+alone the fleet hit `ResolutionImpossible` three times (categories 0.22,
+vocabularies 0.3 then 0.4, reviews 0.7), each time with this package as the
+wall and each time needing a release of it and of stapel-shop before an image
+could be built.
+
+What replaces the cap:
+
+- `.github/workflows/ci.yml` gains a `newest-siblings` matrix leg. It takes no
+  pip cache, installs the package editable with the `test` extra, then upgrades
+  every `stapel-*` requirement to the newest release inside the declared range
+  in ONE pip call (so pip resolves them jointly, the same question the fleet's
+  pre-build gate asks), prints what it got, and runs the whole suite under
+  `STAPEL_TEST_STRICT_SIBLINGS=1`. A sibling minor that really does break this
+  composite turns red the day it is published, instead of surfacing weeks later
+  as a resolver error in someone's image build.
+- `tests/test_sibling_ranges.py` holds the other end: every `stapel-*`
+  requirement in `pyproject.toml`, runtime and extras alike, must carry exactly
+  one floor and exactly one `<1.0`. Reinstate a tighter cap and it fails with
+  the ruling's sentence.
+- MODULE.md states the policy where a contributor will meet it.
+
+Verified against the newest published siblings (stapel-core 0.64.0,
+stapel-attributes 0.9.4, stapel-reviews 0.7.0, stapel-categories 0.22.4,
+stapel-vocabularies 0.4.1, stapel-listings 0.22.10, stapel-geo 0.4.1,
+stapel-search 0.16.5, stapel-moderation 0.8.0, stapel-chat 0.8.6,
+stapel-shop 0.2.36): 214 passed. Note what that set contains — stapel-geo
+0.4.x, stapel-search 0.16.x, stapel-moderation 0.8.0 and stapel-chat 0.8.x
+were all inside the old caps' reach only by accident of when they were cut.
+
 ## [0.10.19] — 2026-09-11
 
 cap-only: stapel-vocabularies `<0.4` → `<0.5`. 0.4.0 adds `Term.extra`, a bag
