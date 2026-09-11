@@ -109,6 +109,13 @@ jobs:
       - name: What actually got installed
         run: pip list --format=freeze | grep -i '^stapel-'
 
+      - name: Assert every sibling really IS the newest in range
+        # `pip install -U` going green is not the claim this leg makes. Its
+        # first run installed stapel-reviews 0.6.1 with 0.7.0 on the index and
+        # inside the range, because stapel-shop 0.2.35 still capped it — pip
+        # backtracks silently and exits 0. See .github/newest_siblings.py.
+        run: python .github/newest_siblings.py
+
       - name: Tests against the newest siblings
         env:
           STAPEL_TEST_STRICT_SIBLINGS: "1"

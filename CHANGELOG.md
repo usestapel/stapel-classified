@@ -46,6 +46,16 @@ stapel-shop 0.2.36): 214 passed. Note what that set contains — stapel-geo
 0.4.x, stapel-search 0.16.x, stapel-moderation 0.8.0 and stapel-chat 0.8.x
 were all inside the old caps' reach only by accident of when they were cut.
 
+Hardened the same day, after the leg's first green run: it had installed
+stapel-reviews 0.6.1 while 0.7.0 was on the index and inside the declared
+range — pip backtracked around stapel-shop 0.2.35's `<0.7` and exited 0, so
+the job reported success without testing the release it names. The leg now
+runs `.github/newest_siblings.py`, which asks the index per package with
+`--no-deps` what the newest version in range is, compares it against what is
+installed, and on a mismatch names the installed distribution whose own
+requirement excluded it. A silent substitution is now a red job. (CI only —
+not part of the published wheel.)
+
 ## [0.10.19] — 2026-09-11
 
 cap-only: stapel-vocabularies `<0.4` → `<0.5`. 0.4.0 adds `Term.extra`, a bag
