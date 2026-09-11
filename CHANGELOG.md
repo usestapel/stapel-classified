@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.19] — 2026-09-11
+
+cap-only: stapel-vocabularies `<0.4` → `<0.5`. 0.4.0 adds `Term.extra`, a bag
+of attributes the source catalogue owns, reached by an optional 7th fixture
+column and read back three ways (`extras` on `vocabularies.terms`, `extra` on
+a REST term row, `terms_with_extra()` on either resolver) — a colour term's
+hue, so a facet can draw a swatch. Nothing this composite touches moves:
+`terms()` still answers `(code, label)` pairs on purpose, and `describe` /
+`exists` / `is_child` / `labels` are unchanged. 0.4.1 lets `null` stand in an
+optional term-row slot. The cap was the only wall, for the third release
+running.
+
 ## [0.10.18] — 2026-09-10
 
 cap-only: stapel-vocabularies `<0.3` → `<0.4` (0.3.0 adds `OrmResolver.terms()`

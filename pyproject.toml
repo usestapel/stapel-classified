@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-classified"
-version = "0.10.18"
+version = "0.10.19"
 description = "Composite: classified ads — the shop composite + geo + search + moderation + vocabularies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -383,7 +383,18 @@ dependencies = [
     # directly anyway (it installs the app, mounts `vocabularies/`, and asserts
     # the ORM resolver is registered). The cap was the only wall, and it was
     # the wall that broke a fleet image build tonight.
-    "stapel-vocabularies>=0.1.4,<0.4",
+    # <0.5, not <0.4: cap-only, and the same wall for the third release
+    # running. stapel-vocabularies 0.4.0 adds `Term.extra` — a per-term bag
+    # the SOURCE catalogue owns, reached by an optional 7th fixture column and
+    # read back as `extras` on `vocabularies.terms`, `extra` on a term of the
+    # REST page, and `terms_with_extra()` on either resolver. Everything this
+    # composite touches is untouched: `terms()` still answers `(code, label)`
+    # pairs (deliberately — the release note explains that the pair is what a
+    # 0.3.0 caller unpacks), and `describe` / `exists` / `is_child` / `labels`
+    # keep their signatures. 0.4.1 lets `null` stand in an optional term-row
+    # slot, which is what an importer crossing `popularity` to reach the bag
+    # writes so a re-import does not demote the term.
+    "stapel-vocabularies>=0.1.4,<0.5",
     # <0.11 with the floor at 0.10 — the same rule 0.4.1 and 0.4.2 applied to
     # this line twice (the enumeration oracle, then ALLOW_ANONYMOUS_WRITES):
     # a deployment able to resolve back onto a listings without the behaviour
