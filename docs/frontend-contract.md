@@ -254,6 +254,22 @@ a client drawing a swipeable strip has something to draw.
   CDN re-encodes anything. Resolve those refs the way you resolve any other
   CDN ref.
 
+### 3.2.2 `description_snippet` — the SEARCH card only
+
+Since 0.11.0 the stored search card carries **`description_snippet`**: the
+first ~160 characters of the listing's description, as plain text, cut on a
+word boundary. It is what fills the tall text column of a list card, which
+until then held price, title, the spec line, badges and a place and nothing
+else.
+
+- It is a **snippet, not the description**. Do not ask for more of it per row
+  and do not re-cut it: the cut is the server's, once, for every client.
+- `""` means this listing has no description. Draw nothing — there is no
+  placeholder string and there never will be.
+- Nothing marks the truncation. Adding «…», a fade or a line clamp is yours;
+  the string itself ends on a whole word.
+- The CHAT card does not carry it. A conversation header is a header.
+
 ### 3.3 `meta_status` on the counterparty
 
 `ok` is the normal answer where stapel-profiles >= 0.16.0 is deployed.

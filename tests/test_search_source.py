@@ -625,3 +625,118 @@ def test_a_listing_without_features_projects_an_empty_line(published_listing):
 
     assert card["features_title"] == []
     assert card["features_badges"] == []
+
+
+# ── the description snippet a list card draws under the title ────────
+#
+# The storefront's list card holds a ~600px text column and, until this
+# section existed, put price, title, a spec line, badges and a place in it and
+# left the rest blank: the stored card carried no description at all, so the
+# column could not be filled from a SERP page however the client drew it.
+# What rides is a SNIPPET — the card's share of the description, cut on the
+# server — never the whole field with the cutting left to a client, which is
+# how one board ends up with four different truncations of the same text.
+
+
+def _snippet(make_listing, description):
+    from stapel_listings.services.publish import publish_listing
+
+    listing = make_listing(description_draft=description)
+    publish_listing(listing)
+    listing.apply_moderation("approved")
+    return _query()["items"][0]["card"]["description_snippet"]
+
+
+def test_a_long_description_is_cut_to_the_card_budget_on_a_word(make_listing):
+    """<= the budget, and never mid-word.
+
+    The cut is the whole claim: a card that carried the whole description
+    would ship a kilobyte per row into a stored document, and a cut taken
+    mid-word reads as a typo rather than as a truncation.
+    """
+    from stapel_classified.conf import classified_settings
+
+    limit = int(classified_settings.CARD_DESCRIPTION_SNIPPET_CHARS)
+    words = ("Отличный телефон в идеальном состоянии, полный комплект, "
+             "чек и коробка на месте, батарея держит весь день. ") * 8
+    assert len(words) > 500
+
+    snippet = _snippet(make_listing, words)
+
+    assert 0 < len(snippet) <= limit
+    # A prefix of the source, and the character right after it is whitespace
+    # (or it is the end) — which is what "cut on a word" means, checked
+    # against the text rather than against a hand-copied expectation.
+    assert words.startswith(snippet)
+    assert words[len(snippet)].isspace()
+    assert not snippet.endswith(" ")
+    # No ellipsis glued on by the server: the snippet is text, and marking a
+    # truncation is the client's typography.
+    assert "…" not in snippet and not snippet.endswith("...")
+
+
+def test_a_short_description_rides_whole(make_listing):
+    """Under the budget nothing is cut — and nothing is padded."""
+    assert _snippet(make_listing, "Продаю телефон.") == "Продаю телефон."
+
+
+def test_a_description_exactly_at_the_budget_rides_whole(make_listing):
+    from stapel_classified.conf import classified_settings
+
+    limit = int(classified_settings.CARD_DESCRIPTION_SNIPPET_CHARS)
+    text = ("word " * 200)[:limit].strip()
+
+    assert _snippet(make_listing, text) == text
+
+
+def test_a_listing_with_no_description_carries_an_empty_snippet(make_listing):
+    """Empty, never a placeholder, and never a missing key.
+
+    The key is always present for the same reason `features_title` is: a
+    client that has to test for a field's existence is a client that renders
+    differently depending on which release indexed the row. Empty is the
+    sentence "this listing says nothing", which a card draws as no line.
+    """
+    assert _snippet(make_listing, "") == ""
+
+
+def test_the_snippet_is_plain_text(make_listing):
+    """Markup and line breaks never reach a card's one-line column."""
+    snippet = _snippet(
+        make_listing,
+        "<b>Телефон</b> &amp; чехол\n\n- полный комплект\n- **чек** на месте",
+    )
+
+    assert "<" not in snippet and ">" not in snippet
+    assert "&amp;" not in snippet
+    assert "\n" not in snippet
+    assert "**" not in snippet
+    assert snippet == "Телефон & чехол полный комплект чек на месте"
+
+
+# The cut itself, at the unit, where the degenerate inputs are cheap to state.
+
+
+@pytest.mark.parametrize(
+    ("text", "limit", "expected"),
+    [
+        ("", 10, ""),
+        (None, 10, ""),
+        ("short", 10, "short"),
+        ("exactly-ten", 11, "exactly-ten"),
+        ("one two three", 8, "one two"),
+        # The boundary lands exactly on the budget: the whole word fits.
+        ("one two three", 7, "one two"),
+        # A single token longer than the budget has no word boundary to cut
+        # on; it is cut at the budget rather than dropped, which is the only
+        # degenerate case that can produce a mid-word edge.
+        ("supercalifragilistic", 8, "supercal"),
+        # Whitespace runs collapse before the cut, so the budget is spent on
+        # characters a reader sees.
+        ("one   two   three", 8, "one two"),
+    ],
+)
+def test_the_cut_rule(text, limit, expected):
+    from stapel_classified.cards import card_description_snippet
+
+    assert card_description_snippet(text, limit=limit) == expected

@@ -26,7 +26,9 @@ Three properties are load-bearing and easy to lose:
 """
 from __future__ import annotations
 
+import html
 import logging
+import re
 from typing import Iterable
 
 logger = logging.getLogger(__name__)
@@ -107,6 +109,86 @@ def card_features(payload: dict) -> dict:
     return {
         key: decorate_card_elements(payload.get(key) or []) for key in CARD_FEATURE_KEYS
     }
+
+
+#: Markup a seller's description can carry into a card, and the card cannot.
+#:
+#: A description is free text typed by a person, but it arrives from editors,
+#: from imports and from other boards' exports, so it can hold HTML tags,
+#: escaped entities, markdown line markers and markdown emphasis. A card's
+#: text column renders a STRING: markup left in it is either printed at the
+#: buyer as punctuation nobody typed, or — worse, if a client ever renders it
+#: — a listing's description deciding how a result page is laid out.
+_HTML_TAG = re.compile(r"<[^>]*>")
+#: Heading, quote and list markers, at the start of a line only.
+_MD_LINE_MARKER = re.compile(r"(?m)^[ \t]*(?:[#>]+|[-*+]|\d+[.)])[ \t]+")
+#: ``[text](url)`` -> ``text``. A URL is not something a card shows.
+_MD_LINK = re.compile(r"\[([^\]\n]*)\]\([^)\n]*\)")
+#: Paired emphasis only, and never mid-word: the opening marker must not
+#: follow a word character, so ``snake_case_name`` keeps its underscores
+#: while ``**receipt**`` loses its asterisks.
+_MD_EMPHASIS = re.compile(r"(?<![\w*_`~])([*_]{1,3}|`+|~~)(?=\S)(.+?)(?<=\S)\1")
+_WHITESPACE = re.compile(r"\s+")
+
+
+def card_plain_text(value) -> str:
+    """Free text as a card can print it: no markup, no line breaks.
+
+    Whitespace collapses last, so a budget measured after this is spent on
+    characters a reader actually sees rather than on a seller's blank lines.
+    """
+    if not value:
+        return ""
+    text = _HTML_TAG.sub(" ", str(value))
+    text = html.unescape(text)
+    text = _MD_LINE_MARKER.sub("", text)
+    text = _MD_LINK.sub(r"\1", text)
+    for _ in range(2):  # nested emphasis, e.g. ``**_x_**``
+        text = _MD_EMPHASIS.sub(r"\2", text)
+    return _WHITESPACE.sub(" ", text).strip()
+
+
+def card_description_snippet(value, *, limit: int | None = None) -> str:
+    """The card's share of a listing's description — plain text, cut on a word.
+
+    The cut lives here and not in a client. A stored card is read by a SERP
+    row, and a row that received the whole description would carry a kilobyte
+    of text nobody draws, once per hit, into a document that is written on
+    every reindex; worse, every client would then invent its own truncation
+    and one board would show four different cuts of the same sentence.
+
+    **Never mid-word.** A cut taken at character *n* regardless of what is
+    there reads as a typo, not as a truncation, and this fleet has a standing
+    ruling against it. So the boundary walks back to the last space inside the
+    budget. The one input with no boundary to walk back to is a single token
+    longer than the whole budget: it is cut at the budget rather than dropped,
+    because an unreadable edge on a 160-character word is a better answer than
+    an empty column.
+
+    Nothing is appended. A snippet is text; marking a truncation with an
+    ellipsis, a fade or a clamp is the client's typography, and a server that
+    glued «…» on would make the string it already cut one character wrong for
+    every client that draws its own.
+
+    Empty in, empty out — and empty for a listing with no description. Never a
+    placeholder: "" is the sentence "this listing says nothing", which a card
+    draws as no line at all.
+    """
+    if limit is None:
+        from .conf import classified_settings
+
+        limit = int(classified_settings.CARD_DESCRIPTION_SNIPPET_CHARS)
+    limit = max(0, int(limit))
+
+    text = card_plain_text(value)
+    if not text or len(text) <= limit:
+        return text
+
+    head = text[: limit + 1]
+    if head[-1].isspace():
+        return head.rstrip()
+    boundary = head.rfind(" ")
+    return head[:boundary] if boundary > 0 else head[:limit]
 
 
 def _base_card(payload: dict) -> dict:
@@ -473,7 +555,9 @@ __all__ = [
     "STATE_AVAILABLE",
     "STATE_GONE",
     "STATE_UNAVAILABLE",
+    "card_description_snippet",
     "card_features",
+    "card_plain_text",
     "listing_cards",
     "seller_cards",
 ]

@@ -79,6 +79,14 @@ DEFAULTS = {
     # of photos mid-swipe, above it the stored card grows for slides nobody
     # reaches. Tuning, deliberately not an axis.
     "CARD_IMAGES_LIMIT": 10,
+    # How much of a listing's description a SEARCH card carries, in
+    # characters. A list card draws one short line under the title and the
+    # cut belongs on the server: shipping the whole field would put a
+    # kilobyte per row into a stored document and would let every client
+    # invent its own truncation of the same text. 160 is what the reference
+    # storefront's list card holds at desktop width before it clamps.
+    # Tuning, deliberately not an axis.
+    "CARD_DESCRIPTION_SNIPPET_CHARS": 160,
     # Template for the public listing URL a moderator's card links to.
     "LISTING_URL_TEMPLATE": "",
     # Template for the public seller URL a moderator's card links to.

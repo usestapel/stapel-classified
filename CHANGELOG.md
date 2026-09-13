@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.11.0] — 2026-09-13
+
+**The stored search card carries `description_snippet`.**
+
+A storefront list card gives its text column several hundred pixels and the
+card had price, title, the spec line, badges and a place to put in it — so a
+wide row rendered half empty, with the listing's own words nowhere on the
+page. The description was already in the document the composite maps
+(`listings.search_documents` serves it, and `map_listing` has always fed it
+to the index's `body`); it simply never reached the card a result row draws
+from, and a SERP page has no budget for a hydration hop per row to go and
+get it.
+
+What ships:
+
+- `cards.card_description_snippet(value, *, limit=None)` — plain text, cut on
+  a WORD boundary at `CARD_DESCRIPTION_SNIPPET_CHARS`. `""` in gives `""`
+  out, and a listing with no description gets `""` rather than a placeholder.
+  The one input with no boundary to cut on — a single token longer than the
+  whole budget — is cut at the budget; every other cut ends on a whole word.
+  Nothing is appended: marking a truncation is the client's typography, and a
+  server that glued «…» on would make the string it just cut one character
+  wrong for every client that draws its own.
+- `cards.card_plain_text(value)` under it — HTML tags and entities, markdown
+  line markers, markdown links and paired emphasis, and line breaks removed,
+  whitespace collapsed last so the budget is spent on characters a reader
+  sees. Emphasis is stripped only where the marker does not follow a word
+  character, so `snake_case_name` keeps its underscores.
+- `search_sources._card` projects the key beside `features_title` /
+  `features_badges`. SEARCH card only — a chat header draws no description,
+  and `ListingCardDTO` is this module's published contract for that one.
+- `conf.CARD_DESCRIPTION_SNIPPET_CHARS` (160) — tuning, deliberately not an
+  axis, the same shape as `CARD_IMAGES_LIMIT`.
+
+Why the cut is the server's: a stored card is rewritten on every reindex, so
+shipping the whole field would put a kilobyte of undrawn text per row into
+the document; and a field the client cuts is four clients inventing four
+truncations of one sentence.
+
+Minor, not patch: a stored document grows a key. Existing rows gain it on the
+next `search_rebuild` (or the next `listing.updated` for a given listing) and
+a client that does not read it is unaffected.
+
 ## [0.10.20] — 2026-09-11
 
 Patch. Every `stapel-*` sibling range widens to `>=<floor>,<1.0` — all eleven

@@ -184,15 +184,30 @@ def _card(payload: dict) -> dict:
     decorate_card_elements` is the rule that turns a DAO into something a card
     can print. ``cards.card_features`` calls it; nothing is re-derived here.
 
-    The two lists live BESIDE the base card rather than inside it: a chat
-    header is a header and does not draw a spec line, and ``ListingCardDTO``
-    is this module's published contract for that header. Growing the search
-    card is additive to a stored document; growing the chat card is an API
-    change, and the two are not the same decision.
-    """
-    from .cards import _base_card, card_features
+    **And a description snippet** (``description_snippet``, since 0.11.0).
+    The storefront's list card holds a ~600px text column and had price,
+    title, the spec line, badges and a place to put in it — so a wide card
+    rendered half empty, because the stored card carried no description at
+    all and a SERP page has no budget for a hydration hop per row to fetch
+    one. It is a SNIPPET, cut on the server by
+    :func:`~stapel_classified.cards.card_description_snippet`: shipping the
+    whole field would put a kilobyte of undrawn text per row into a document
+    rewritten on every reindex, and would leave four clients inventing four
+    truncations of one sentence.
 
-    return {**_base_card(payload), **card_features(payload)}
+    The three live BESIDE the base card rather than inside it: a chat header
+    is a header and draws neither a spec line nor a description, and
+    ``ListingCardDTO`` is this module's published contract for that header.
+    Growing the search card is additive to a stored document; growing the
+    chat card is an API change, and the two are not the same decision.
+    """
+    from .cards import _base_card, card_description_snippet, card_features
+
+    return {
+        **_base_card(payload),
+        **card_features(payload),
+        "description_snippet": card_description_snippet(payload.get("description")),
+    }
 
 
 def map_listing(payload: dict):

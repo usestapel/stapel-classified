@@ -100,11 +100,25 @@
     }
   ],
   "surface": {
+    "card_description_snippet": {
+      "kind": "factory",
+      "intent": "A listing description as a list card's text column carries it: plain text, no markup, cut on a word boundary at CARD_DESCRIPTION_SNIPPET_CHARS. The cut belongs on the server so one board cannot show four truncations of one sentence; empty in means empty out, never a placeholder.",
+      "instead_of": [
+        "shipping the whole description to a result row and truncating it in the client"
+      ]
+    },
     "card_features": {
       "kind": "factory",
       "intent": "The card badge contract over a listing document's `features_title` / `features_badges` — the short spec line a result row prints under the title, with `label`, `unit` and a `presentation` telling the client which of the four ways to write the element.",
       "instead_of": [
         "deriving a caption and a unit from a stored attribute DAO yourself"
+      ]
+    },
+    "card_plain_text": {
+      "kind": "factory",
+      "intent": "Free text a person typed, reduced to what a card can print: HTML tags and entities, markdown markers and line breaks gone, whitespace collapsed.",
+      "instead_of": [
+        "rendering a seller's description as markup on a result page"
       ]
     },
     "chat_threads": {

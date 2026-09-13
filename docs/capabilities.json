@@ -1,6 +1,6 @@
 {
   "module": "stapel-classified",
-  "version": "0.10.20",
+  "version": "0.11.0",
   "provides": "Composite for location-bound classified ads: the stapel-shop composite (categories + listings + reviews) plus stapel-geo, stapel-search and stapel-moderation, and the cross-domain declarations no member is allowed to write — the `listing` search source, the `listing`/`review`/`seller`/`chat_message` moderation target policies, the marketplace reason taxonomy, and (since 0.3.2) the `listing` subject type stapel-chat's registry ships empty of. Its own HTTP surface is a conversation HEADER, assembled from three modules that may not know about each other: chat says who is in the thread and what it is about, listings answers the short card (title, price, the photo gallery with CDN render metadata, and a state that says `available`, `unavailable` or `gone` — exactly the answer a public read cannot give), profiles answers the counterparty. It owns NO table: the binding it kept from 0.2.0 to 0.3.1 existed only because chat could not tell two threads about two listings apart, and it was deleted rather than kept in sync the release chat could. It enforces no block of its own: stapel-chat 0.6.1 holds both write doors (opening a direct thread, sending into one) at the one point every client passes, and this composite's whole contribution is the value `required` it sets on chat's BLOCK_ENFORCEMENT axis in the preset. The pre-creation door it kept until 0.3.x was deleted in 0.4.0, and a deployment that still declares the old STAPEL_CLASSIFIED keys is told so at boot (E003) rather than silently inheriting chat's default.",
   "axes": [
     {
@@ -65,12 +65,30 @@
   ],
   "surface": [
     {
+      "name": "card_description_snippet",
+      "kind": "factory",
+      "path": "stapel_classified.cards.card_description_snippet",
+      "intent": "A listing description as a list card's text column carries it: plain text, no markup, cut on a word boundary at CARD_DESCRIPTION_SNIPPET_CHARS. The cut belongs on the server so one board cannot show four truncations of one sentence; empty in means empty out, never a placeholder.",
+      "instead_of": [
+        "shipping the whole description to a result row and truncating it in the client"
+      ]
+    },
+    {
       "name": "card_features",
       "kind": "factory",
       "path": "stapel_classified.cards.card_features",
       "intent": "The card badge contract over a listing document's `features_title` / `features_badges` — the short spec line a result row prints under the title, with `label`, `unit` and a `presentation` telling the client which of the four ways to write the element.",
       "instead_of": [
         "deriving a caption and a unit from a stored attribute DAO yourself"
+      ]
+    },
+    {
+      "name": "card_plain_text",
+      "kind": "factory",
+      "path": "stapel_classified.cards.card_plain_text",
+      "intent": "Free text a person typed, reduced to what a card can print: HTML tags and entities, markdown markers and line breaks gone, whitespace collapsed.",
+      "instead_of": [
+        "rendering a seller's description as markup on a result page"
       ]
     },
     {

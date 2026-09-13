@@ -110,6 +110,18 @@ that and neither can a catalogue.
   «Этаж 3» and «42 м²» decidable server-side, with no category schema at the
   client. It rides on the SEARCH card only — a chat header draws no spec line,
   and `ListingCardDTO` is this module's published contract for that header.
+- **`cards.card_description_snippet` is the DESCRIPTION SNIPPET** (0.11.0),
+  and it rides on the SEARCH card only, beside the spec line, for the same
+  reason. A list card holds a text column several times taller than price +
+  title + spec line + place, and the stored card carried nothing to fill it —
+  while a SERP page has no budget for a hydration hop per row to fetch a
+  description. What rides is a snippet, not the field: plain text (HTML,
+  markdown and line breaks removed), cut on a WORD boundary at
+  `CARD_DESCRIPTION_SNIPPET_CHARS` (160), `""` when there is no description
+  and never a placeholder. The cut is the server's because a stored document
+  is rewritten on every reindex and because four clients cutting one sentence
+  produce four different cards; the ellipsis, fade or clamp that MARKS the
+  truncation stays the client's typography and is never glued on here.
 - **`state`: `available` / `unavailable` / `gone`.** The public listing read
   404s everything not published; that is right for a stranger and useless for
   the person in the conversation about it, which is exactly when a buyer is
