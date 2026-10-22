@@ -251,6 +251,18 @@ def pytest_configure(config):
                 "EXCEPTION_HANDLER": BASE_REST_FRAMEWORK["EXCEPTION_HANDLER"],
             },
         )
+        # The beat schedule a generated host writes into its settings
+        # (moderation.W004 and stapel_search.W003 fire on an absent one since
+        # moderation 0.8.4 / search 0.18.2). Built after configure() because
+        # both helpers read their cadences from settings.
+        from stapel_moderation.beat import get_moderation_beat_schedule
+        from stapel_search.tasks import get_search_beat_schedule
+
+        settings.CELERY_BEAT_SCHEDULE = {
+            **get_moderation_beat_schedule(),
+            **get_search_beat_schedule(),
+        }
+
         import django
 
         django.setup()

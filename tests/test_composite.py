@@ -61,6 +61,9 @@ def test_app_config_mounts():
     assert cfg.name == "stapel_classified"
 
 
+# Model field checks reach the connection (JSONField asks the sqlite backend
+# whether it supports JSON), so the run needs database access.
+@pytest.mark.django_db
 def test_system_checks_report_no_errors():
     """``manage.py check`` on a realistic host — the composite's boot gate.
 
@@ -289,3 +292,15 @@ def test_no_missing_migrations():
 
     out = StringIO()
     call_command("makemigrations", "--check", "--dry-run", stdout=out, stderr=out)
+
+
+def test_install_order_is_the_generated_order():
+    """The order a generated project emits (stapel-tools registry order, held
+    equal by stapel-preset-gate): vocabularies first, the fact listeners
+    after the facts' owners, the two composites last."""
+    apps = preset.INSTALLED_APPS
+    assert apps[0] == "stapel_vocabularies"
+    assert apps[-2:] == ["stapel_shop", "stapel_classified"]
+    for owner in ("stapel_listings", "stapel_reviews"):
+        assert apps.index(owner) < apps.index("stapel_search")
+        assert apps.index(owner) < apps.index("stapel_moderation")

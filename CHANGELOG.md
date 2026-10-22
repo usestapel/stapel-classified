@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.11.1] — 2026-10-22
+
+Patch. **The preset's INSTALLED_APPS follow the order a generated project
+emits**: vocabularies, categories, geo, listings, reviews, search,
+moderation, then the two composites. Every constraint the old order stated
+still holds (vocabularies first, the fact listeners after the facts'
+owners); the composites moved last, after the members their glue reads.
+`stapel-preset-gate` in stapel-tools holds the preset and the scaffold
+registry equal, order included.
+
+The suite's harness now writes the beat schedule a host writes
+(`get_moderation_beat_schedule()` and `get_search_beat_schedule()`, since
+moderation.W004 and stapel_search.W003 fire on an absent schedule), and the
+system-check test takes database access (model field checks reach the
+connection). Both had kept CI red against the newest siblings since
+2026-09-16.
+
 ## [0.11.0] — 2026-09-13
 
 **The stored search card carries `description_snippet`.**

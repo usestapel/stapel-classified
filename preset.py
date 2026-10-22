@@ -32,12 +32,14 @@ INSTALLED_APPS = [
     # is the first of them and the one this composite mounts.
     "stapel_vocabularies",
     "stapel_categories",
+    "stapel_geo",
     "stapel_listings",
     "stapel_reviews",
-    "stapel_shop",
-    "stapel_geo",
     "stapel_search",
     "stapel_moderation",
+    # The composites last: their glue reads the members, never the reverse.
+    # The same order a generated project emits (stapel-preset-gate).
+    "stapel_shop",
     "stapel_classified",
 ]
 
