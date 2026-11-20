@@ -737,6 +737,12 @@ Changelog = "https://github.com/usestapel/stapel-classified/blob/main/CHANGELOG.
 Issues = "https://github.com/usestapel/stapel-classified/issues"
 
 [project.optional-dependencies]
+# Celery stays optional, as in every member: moderation's and search's jobs are
+# plain callables a cron can run, registered as celery tasks when celery is
+# importable. A host that runs them from celery beat installs this extra and
+# writes `get_moderation_beat_schedule()` / `get_search_beat_schedule()` into
+# CELERY_BEAT_SCHEDULE; both helpers build crontab entries and need celery.
+celery = ["celery>=5"]
 all = []
 # What the TEST SUITE needs, as opposed to what the package needs. It is a
 # declaration, not a convenience: every sibling any test imports OR MOUNTS
@@ -754,6 +760,11 @@ test = [
     "channels",
     "daphne",
     "stapel-tools>=0.9.1,<1.0",
+    # The harness is a celery-beat host: it writes the beat schedule the
+    # moderation and search helpers build (crontab entries), so moderation.W004
+    # and stapel_search.W003 see the jobs scheduled. No member pulls celery in
+    # any more (celery is an optional extra fleet-wide).
+    "celery>=5",
     # Mounted in conftest.py, not imported by any test file: the block
     # provider (`profiles.relationships`) BLOCK_ENFORCEMENT="required"
     # demands, and the display-name/public-card reads the header makes.

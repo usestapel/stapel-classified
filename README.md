@@ -30,7 +30,7 @@ pip install stapel-classified
 | Config axes | 3 |
 | Usage surface | 10 |
 | Extension points | 3 |
-| Error codes | 46 |
+| Error codes | 47 |
 | Fleet dependencies | [`stapel-attributes`](https://github.com/usestapel/stapel-attributes) · [`stapel-categories`](https://github.com/usestapel/stapel-categories) · [`stapel-cdn`](https://github.com/usestapel/stapel-cdn) (optional) · [`stapel-chat`](https://github.com/usestapel/stapel-chat) · [`stapel-geo`](https://github.com/usestapel/stapel-geo) · [`stapel-listings`](https://github.com/usestapel/stapel-listings) · [`stapel-moderation`](https://github.com/usestapel/stapel-moderation) · [`stapel-notifications`](https://github.com/usestapel/stapel-notifications) (optional) · [`stapel-profiles`](https://github.com/usestapel/stapel-profiles) (optional) · [`stapel-reviews`](https://github.com/usestapel/stapel-reviews) · [`stapel-search`](https://github.com/usestapel/stapel-search) |
 
 ## Documentation

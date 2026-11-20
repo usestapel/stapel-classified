@@ -119,6 +119,11 @@ def test_system_checks_report_no_errors():
             #     worker, which is what the check exists to say out loud.
             "stapel_moderation.W006",
             "stapel_chat.W001",
+            #   chat.W006 — no cdn in this harness (the tests stand in for
+            #     cdn.describe_many per test), so cdn.ownership has no
+            #     provider and chat says attachment ownership is unverified.
+            #     A deployment mounts or routes cdn and the warning goes.
+            "stapel_chat.W006",
             "stapel_listings.W001",
             "realtime.W006",
         )
